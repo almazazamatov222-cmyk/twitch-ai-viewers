@@ -1,16 +1,12 @@
 import { Bot } from './bot';
 import { AIService } from './ai';
 import { logger } from './logger';
+import { startDashboardServer } from './server';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const requiredEnvVars = [
-  'TWITCH_CHANNEL',
-  'TWITCH_CLIENT_ID',
-  'TWITCH_CLIENT_SECRET',
-  'GROQ_API_KEY'
-];
+const requiredEnvVars = ['TWITCH_CHANNEL', 'TWITCH_CLIENT_ID', 'TWITCH_CLIENT_SECRET', 'GROQ_API_KEY'];
 
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
@@ -40,17 +36,14 @@ async function main() {
 
     while (true) {
       const username = process.env[`BOT${botIndex}_USERNAME`];
-      // Support both BOT1_OAUTH_TOKEN and BOT1_OAUTH
       const oauth = process.env[`BOT${botIndex}_OAUTH_TOKEN`] || process.env[`BOT${botIndex}_OAUTH`];
-
       if (!username || !oauth) break;
-
       botCredentials.push({ username, oauth });
       botIndex++;
     }
 
     if (botCredentials.length === 0) {
-      throw new Error('No bot credentials found. Set BOT1_USERNAME and BOT1_OAUTH_TOKEN in environment variables');
+      throw new Error('No bot credentials found. Set BOT1_USERNAME and BOT1_OAUTH_TOKEN');
     }
 
     logger.info(`Found ${botCredentials.length} bot(s) in environment variables`);
@@ -60,7 +53,7 @@ async function main() {
       ? channelUrl.split('twitch.tv/')[1].split('/')[0].split('?')[0]
       : channelUrl;
 
-    logger.info(`Setting up voice capture for channel: ${channelName}`);
+    logger.info(`Setting up for channel: ${channelName}`);
 
     for (let i = 0; i < botCredentials.length; i++) {
       const credentials = botCredentials[i];
@@ -70,7 +63,7 @@ async function main() {
           oauth: credentials.oauth,
           channel: channelName,
           aiService,
-          shouldHandleVoiceCapture: i === 0 // only first bot handles voice
+          shouldHandleVoiceCapture: i === 0
         });
         bots.push(bot);
         bot.connect();
@@ -78,6 +71,9 @@ async function main() {
         logger.error(`Error creating bot ${credentials.username}:`, error);
       }
     }
+
+    // Запуск дашборда
+    startDashboardServer(aiService, bots);
 
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
