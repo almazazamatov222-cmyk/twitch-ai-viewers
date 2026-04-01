@@ -15,27 +15,20 @@
 body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; font-size:14px; height:100vh; overflow:hidden; }
 .layout { display:grid; grid-template-columns:260px 1fr 280px; grid-template-rows:48px 1fr; height:100vh; }
 
-/* topbar */
 .topbar { grid-column:1/-1; background:var(--bg2); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; gap:10px; }
 .logo { font-size:15px; font-weight:700; color:var(--purple); }
 .badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; letter-spacing:1px; background:var(--bg3); color:var(--muted); }
 .badge.live { background:var(--red); color:white; }
-.ch { font-weight:600; }
-.game { color:var(--muted); font-size:13px; margin-left:auto; }
-.vw { color:var(--muted); font-size:13px; margin-left:10px; }
+.ch { font-weight:600; } .game { color:var(--muted); font-size:13px; margin-left:auto; } .vw { color:var(--muted); font-size:13px; margin-left:10px; }
 
-/* left */
 .left { background:var(--bg2); border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
 .sec-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; padding:12px 14px 6px; }
 
-/* bots */
 .bot-row { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--border); }
 .bav { width:32px; height:32px; border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
 .bav.off { background:var(--bg3); color:var(--muted); }
-.binfo { flex:1; min-width:0; }
-.bname { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bst { font-size:11px; color:var(--muted); }
-.bst.on { color:var(--green); }
+.binfo { flex:1; min-width:0; } .bname { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bst { font-size:11px; color:var(--muted); } .bst.on { color:var(--green); }
 .tog { position:relative; width:34px; height:18px; cursor:pointer; flex-shrink:0; }
 .tog input { opacity:0; width:0; height:0; }
 .sl { position:absolute; inset:0; background:var(--border); border-radius:18px; transition:.2s; }
@@ -43,46 +36,36 @@ body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif
 input:checked+.sl { background:var(--purple); }
 input:checked+.sl::before { transform:translateX(16px); }
 
-/* phrases */
 .pg { border-bottom:1px solid var(--border); }
 .pg-head { display:flex; align-items:center; padding:8px 14px 4px; gap:6px; }
 .pg-name-btn { flex:1; background:none; border:none; color:var(--muted); font-size:12px; font-weight:700; cursor:pointer; text-align:left; padding:0; }
 .pg-name-btn:hover { color:var(--purple); }
-.pg-actions { display:flex; gap:4px; opacity:0; transition:opacity .15s; }
-.pg:hover .pg-actions { opacity:1; }
-.ic-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; padding:2px 4px; border-radius:4px; }
-.ic-btn:hover { background:var(--bg4); color:var(--text); }
-.ic-btn.del:hover { color:var(--red); }
+.pg-acts { display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+.pg:hover .pg-acts { opacity:1; }
+.ic { background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; padding:2px 5px; border-radius:4px; }
+.ic:hover { background:var(--bg4); color:var(--text); }
+.ic.del:hover { color:var(--red); }
 .tags { display:flex; flex-wrap:wrap; gap:5px; padding:0 14px 10px; }
-.tag { position:relative; font-size:12px; padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:20px; cursor:pointer; color:var(--text); transition:all .15s; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; }
+.tag { font-size:12px; padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:20px; cursor:pointer; color:var(--text); transition:all .15s; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; user-select:none; }
 .tag:hover { background:var(--purple); border-color:var(--purple); color:white; }
-.tag .x { display:none; font-size:10px; line-height:1; }
-.tag:hover .x { display:inline; opacity:.7; }
-.tag .x:hover { opacity:1; }
+.tag-x { font-size:9px; opacity:0; pointer-events:none; }
+.tag:hover .tag-x { opacity:.8; pointer-events:auto; }
 .add-tag { font-size:12px; padding:4px 10px; background:transparent; border:1px dashed var(--border); border-radius:20px; cursor:pointer; color:var(--muted); }
 .add-tag:hover { border-color:var(--purple); color:var(--purple); }
-.new-group-btn { margin:8px 14px 14px; width:calc(100% - 28px); }
 
-/* center */
 .center { display:flex; flex-direction:column; overflow:hidden; }
-.chat-hdr { padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg2); font-size:12px; font-weight:600; color:var(--muted); display:flex; align-items:center; gap:8px; }
+.chat-hdr { padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg2); font-size:12px; font-weight:600; color:var(--muted); display:flex; align-items:center; }
 .msgs { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:3px; }
 .msgs::-webkit-scrollbar { width:4px; }
 .msgs::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
-.msg { display:flex; gap:8px; padding:4px 6px; border-radius:6px; cursor:default; }
+.msg { display:flex; gap:8px; padding:4px 6px; border-radius:6px; }
 .msg:hover { background:var(--bg3); }
 .mav { width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; margin-top:1px; }
-.mav.bot { background:var(--purple); }
-.mav.user { background:#1e5f8a; }
-.mav.streamer { background:#92400e; }
-.mav.system { background:var(--bg4); color:var(--muted); }
+.mav.bot{background:var(--purple);} .mav.user{background:#1e5f8a;} .mav.streamer{background:#92400e;} .mav.system{background:var(--bg4);color:var(--muted);}
 .mbody { flex:1; }
 .mmeta { display:flex; align-items:baseline; gap:6px; margin-bottom:1px; }
 .mname { font-size:12px; font-weight:700; }
-.mname.bot { color:var(--purple); }
-.mname.user { color:#5ba3d9; }
-.mname.streamer { color:#f59e0b; }
-.mname.system { color:var(--muted); }
+.mname.bot{color:var(--purple);} .mname.user{color:#5ba3d9;} .mname.streamer{color:#f59e0b;} .mname.system{color:var(--muted);}
 .mtime { font-size:10px; color:var(--muted); }
 .mtext { font-size:13px; line-height:1.4; word-break:break-word; }
 .mact { margin-top:3px; display:none; gap:4px; }
@@ -90,12 +73,10 @@ input:checked+.sl::before { transform:translateX(16px); }
 .mbtn { font-size:11px; padding:2px 8px; background:var(--bg3); border:1px solid var(--border); border-radius:4px; cursor:pointer; color:var(--muted); }
 .mbtn:hover { color:var(--text); border-color:var(--purple); }
 
-/* send area */
 .send-wrap { border-top:1px solid var(--border); padding:10px 14px; background:var(--bg2); }
-.reply-bar { display:flex; align-items:center; gap:8px; padding:5px 10px; background:var(--bg3); border-left:2px solid var(--purple); border-radius:0 4px 4px 0; margin-bottom:8px; font-size:12px; color:var(--muted); }
-.reply-bar.hidden { display:none; }
-.rx { cursor:pointer; margin-left:auto; }
-.rx:hover { color:var(--text); }
+.rbar { display:flex; align-items:center; gap:8px; padding:5px 10px; background:var(--bg3); border-left:2px solid var(--purple); border-radius:0 4px 4px 0; margin-bottom:8px; font-size:12px; color:var(--muted); }
+.rbar.hidden { display:none; }
+.rx { cursor:pointer; margin-left:auto; } .rx:hover { color:var(--text); }
 .send-row { display:flex; gap:8px; }
 select.bsel { background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text); padding:0 10px; font-size:13px; cursor:pointer; height:36px; flex-shrink:0; }
 .inp { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text); padding:0 12px; font-size:13px; height:36px; outline:none; }
@@ -103,14 +84,12 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
 .sbtn { background:var(--purple); border:none; border-radius:var(--r); color:white; padding:0 18px; font-size:13px; font-weight:600; cursor:pointer; height:36px; }
 .sbtn:hover { background:#7c3bda; }
 
-/* right */
 .right { background:var(--bg2); border-left:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
 .tr-area { padding:8px 14px; flex:1; }
 .tr-item { padding:8px 10px; background:var(--bg3); border-radius:var(--r); margin-bottom:6px; font-size:12px; line-height:1.5; border-left:2px solid var(--purple); }
 .tr-t { font-size:10px; color:var(--muted); margin-top:3px; }
 .no-tr { color:var(--muted); font-size:13px; text-align:center; padding:24px 14px; line-height:1.8; }
 
-/* modal */
 .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:100; }
 .modal-bg.hidden { display:none; }
 .modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; width:320px; }
@@ -118,16 +97,15 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
 .modal input { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text); padding:8px 12px; font-size:13px; margin-bottom:8px; outline:none; }
 .modal input:focus { border-color:var(--purple); }
 .mbtns { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
-.mbtn2 { padding:7px 16px; border-radius:var(--r); border:none; cursor:pointer; font-size:13px; font-weight:600; }
-.mbtn2.c { background:var(--bg3); color:var(--muted); border:1px solid var(--border); }
-.mbtn2.ok { background:var(--purple); color:white; }
+.mb { padding:7px 16px; border-radius:var(--r); border:none; cursor:pointer; font-size:13px; font-weight:600; }
+.mb.c { background:var(--bg3); color:var(--muted); border:1px solid var(--border); }
+.mb.ok { background:var(--purple); color:white; }
 @keyframes fi { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
 .msg { animation:fi .15s ease; }
 </style>
 </head>
 <body>
 <div class="layout">
-
 <div class="topbar">
   <span class="logo">⬡ BOT DASHBOARD</span>
   <span class="badge" id="lbadge">ОФЛАЙН</span>
@@ -141,7 +119,9 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
   <div id="bot-list"></div>
   <div class="sec-title" style="margin-top:8px">Быстрые фразы</div>
   <div id="phrase-list"></div>
-  <button class="add-tag new-group-btn" onclick="openModal('new-group')">+ новая группа</button>
+  <div style="padding:8px 14px 14px">
+    <button class="add-tag" style="width:100%;text-align:center;padding:7px" id="new-group-btn">+ новая группа</button>
+  </div>
 </div>
 
 <div class="center">
@@ -151,14 +131,14 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
   </div>
   <div class="msgs" id="chat"></div>
   <div class="send-wrap">
-    <div class="reply-bar hidden" id="rbar">
+    <div class="rbar hidden" id="rbar">
       <span id="rlabel">Ответ для @...</span>
-      <span class="rx" onclick="clearReply()">✕</span>
+      <span class="rx" id="rx">✕</span>
     </div>
     <div class="send-row">
       <select class="bsel" id="bsel"></select>
-      <input class="inp" id="minp" placeholder="Написать от имени бота..." onkeydown="if(event.key==='Enter')sendMsg()">
-      <button class="sbtn" onclick="sendMsg()">Отправить</button>
+      <input class="inp" id="minp" placeholder="Написать от имени бота...">
+      <button class="sbtn" id="sendbtn">Отправить</button>
     </div>
   </div>
 </div>
@@ -166,235 +146,281 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
 <div class="right">
   <div class="sec-title" style="padding:12px 14px 6px">Транскрипция</div>
   <div class="tr-area" id="trarea">
-    <div class="no-tr" id="notr">Ожидание речи...<br><small style="opacity:.5;font-size:11px">Появится когда начнёшь говорить на стриме</small></div>
+    <div class="no-tr" id="notr">Ожидание речи...<br><small style="opacity:.5;font-size:11px">Появится когда начнёшь говорить</small></div>
   </div>
 </div>
-
 </div>
 
-<!-- Modal -->
 <div class="modal-bg hidden" id="modal">
   <div class="modal">
-    <h3 id="mtitle">Добавить</h3>
-    <input id="mi1" placeholder="" />
-    <input id="mi2" placeholder="" style="display:none" />
+    <h3 id="mtitle">Действие</h3>
+    <input id="mi1" />
+    <input id="mi2" style="display:none" />
     <div class="mbtns">
-      <button class="mbtn2 c" onclick="closeModal()">Отмена</button>
-      <button class="mbtn2 ok" id="mok" onclick="modalOk()">Добавить</button>
+      <button class="mb c" id="mcancel">Отмена</button>
+      <button class="mb ok" id="mok">Добавить</button>
     </div>
   </div>
 </div>
 
 <script>
 const socket = io();
+
+// ── State ─────────────────────────────────────────
 let replyTo = null;
 let botList = [];
 let mcnt = 0;
+let selectedBot = 0;
+let phraseData = {}; // { groupName: [phrase, ...] }
 let modalMode = '';
-let modalData = {};
-let selectedBotIdx = 0;
+let modalCtx = {};
 
-// ─── API helpers ───────────────────────────────────────────
-const api = (url, body) => fetch(url, {
-  method:'POST', headers:{'Content-Type':'application/json'},
+// ── Helpers ───────────────────────────────────────
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const post = (url, body) => fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body)
-}).then(r=>r.json());
+}).then(r => r.json());
 
-// ─── Init ──────────────────────────────────────────────────
+function now() {
+  return new Date().toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ── Load status ───────────────────────────────────
 async function loadStatus() {
   try {
-    const d = await fetch('/api/status').then(r=>r.json());
+    const d = await fetch('/api/status').then(r => r.json());
     botList = d.bots || [];
+    phraseData = d.phraseGroups || {};
     renderBots(botList);
-    renderPhrases(d.phraseGroups || {});
+    renderPhrases(phraseData);
     updateHeader(d.channelInfo, d.channel);
 
     const sel = document.getElementById('bsel');
-    const cur = sel.value;
-    sel.innerHTML = botList.map((b,i)=>`<option value="${i}">${b.username}</option>`).join('');
-    if (cur) sel.value = cur;
-    selectedBotIdx = parseInt(sel.value) || 0;
-  } catch(e) { console.error(e); }
+    const prev = sel.value;
+    sel.innerHTML = botList.map((b,i) => `<option value="${i}">${b.username}</option>`).join('');
+    if (prev && sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+    selectedBot = parseInt(sel.value) || 0;
+  } catch(e) { console.error('loadStatus error', e); }
 }
 
-document.getElementById('bsel').addEventListener('change', function() {
-  selectedBotIdx = parseInt(this.value) || 0;
-});
-
+// ── Header ────────────────────────────────────────
 function updateHeader(info, channel) {
-  const name = (channel||'').includes('twitch.tv/') ? channel.split('twitch.tv/')[1].split('/')[0] : channel||'';
+  const name = (channel||'').includes('twitch.tv/')
+    ? channel.split('twitch.tv/')[1].split('/')[0] : (channel||'');
   document.getElementById('chname').textContent = name;
   if (!info) return;
-  document.getElementById('gname').textContent = info.gameName && info.gameName !== 'Not specified' ? '🎮 '+info.gameName : '';
+  const g = info.gameName && info.gameName !== 'Not specified' ? '🎮 '+info.gameName : '';
+  document.getElementById('gname').textContent = g;
   document.getElementById('vw').textContent = info.viewerCount ? '👁 '+info.viewerCount : '';
-  const b = document.getElementById('lbadge');
-  if (info.isLive) { b.textContent='LIVE'; b.classList.add('live'); }
+  if (info.isLive) {
+    const b = document.getElementById('lbadge');
+    b.textContent = 'LIVE'; b.classList.add('live');
+  }
 }
 
-// ─── Bots ──────────────────────────────────────────────────
+// ── Bots ──────────────────────────────────────────
 function renderBots(bots) {
-  document.getElementById('bot-list').innerHTML = bots.map((b,i)=>`
+  document.getElementById('bot-list').innerHTML = bots.map((b,i) => `
     <div class="bot-row">
-      <div class="bav ${b.enabled?'':'off'}">${b.username.slice(0,2).toUpperCase()}</div>
+      <div class="bav ${b.enabled?'':'off'}">${esc(b.username.slice(0,2).toUpperCase())}</div>
       <div class="binfo">
-        <div class="bname">${b.username}</div>
+        <div class="bname">${esc(b.username)}</div>
         <div class="bst ${b.connected&&b.enabled?'on':''}">${b.connected&&b.enabled?'онлайн':'выключен'}</div>
       </div>
       <label class="tog">
-        <input type="checkbox" ${b.enabled?'checked':''} onchange="toggleBot(${i})">
+        <input type="checkbox" ${b.enabled?'checked':''} data-bot="${i}" class="bot-toggle">
         <span class="sl"></span>
       </label>
     </div>`).join('');
 }
 
-async function toggleBot(i) {
-  await api('/api/toggle-bot',{botIndex:i});
-  setTimeout(loadStatus, 500);
-}
+document.getElementById('bot-list').addEventListener('change', async e => {
+  if (e.target.classList.contains('bot-toggle')) {
+    await post('/api/toggle-bot', { botIndex: parseInt(e.target.dataset.bot) });
+    setTimeout(loadStatus, 500);
+  }
+});
 
-// ─── Phrases ───────────────────────────────────────────────
+// ── Phrases ───────────────────────────────────────
 function renderPhrases(groups) {
-  document.getElementById('phrase-list').innerHTML = Object.entries(groups).map(([g, phrases])=>`
+  const groups_arr = Object.entries(groups);
+  document.getElementById('phrase-list').innerHTML = groups_arr.map(([g, phrases], gi) => `
     <div class="pg">
       <div class="pg-head">
-        <button class="pg-name-btn" onclick="sendRandom(${JSON.stringify(g)})" title="Отправить случайную">${g} ▸</button>
-        <div class="pg-actions">
-          <button class="ic-btn" onclick="openModal('rename-group',{group:${JSON.stringify(g)}})" title="Переименовать">✎</button>
-          <button class="ic-btn del" onclick="deleteGroup(${JSON.stringify(g)})" title="Удалить группу">✕</button>
+        <button class="pg-name-btn" data-action="random" data-group="${esc(g)}">${esc(g)} ▸</button>
+        <div class="pg-acts">
+          <button class="ic" data-action="rename-group" data-group="${esc(g)}" title="Переименовать">✎</button>
+          <button class="ic del" data-action="del-group" data-group="${esc(g)}" title="Удалить группу">✕</button>
         </div>
       </div>
       <div class="tags">
-        ${phrases.map(p=>`
-          <span class="tag">
-            <span onclick="sendExact(${JSON.stringify(p)})">${p}</span>
-            <span class="x" onclick="event.stopPropagation();deletePhrase(${JSON.stringify(g)},${JSON.stringify(p)})">✕</span>
+        ${(phrases||[]).map((p, pi) => `
+          <span class="tag" data-action="exact" data-group="${esc(g)}" data-pi="${pi}">
+            <span class="tag-text">${esc(p)}</span>
+            <span class="tag-x" data-action="del-phrase" data-group="${esc(g)}" data-pi="${pi}">✕</span>
           </span>`).join('')}
-        <button class="add-tag" onclick="openModal('add-phrase',{group:${JSON.stringify(g)}})">+ фраза</button>
+        <button class="add-tag" data-action="add-phrase" data-group="${esc(g)}">+ фраза</button>
       </div>
     </div>`).join('');
 }
 
-async function sendRandom(group) {
-  await api('/api/phrase/random', { group, botIndex: selectedBotIdx });
-}
+// Single event listener for ALL phrase interactions
+document.getElementById('phrase-list').addEventListener('click', async e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
 
-async function sendExact(phrase) {
-  await api('/api/phrase/exact', { phrase, botIndex: selectedBotIdx });
-}
+  const action = el.dataset.action;
+  const group = el.dataset.group;
+  // Decode group (was escaped for HTML attr, but data reads decoded)
+  const phrases = phraseData[group] || [];
+  const pi = parseInt(el.dataset.pi);
 
-async function deletePhrase(group, phrase) {
-  await api('/api/phrases/delete', { group, phrase });
-}
+  e.stopPropagation();
 
-async function deleteGroup(group) {
-  if (!confirm(`Удалить группу "${group}" со всеми фразами?`)) return;
-  await api('/api/phrases/delete-group', { group });
-}
+  if (action === 'random') {
+    if (!phrases.length) return;
+    const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+    await post('/api/phrase/exact', { phrase, botIndex: selectedBot });
+  } else if (action === 'exact') {
+    if (!isNaN(pi) && phrases[pi] !== undefined) {
+      await post('/api/phrase/exact', { phrase: phrases[pi], botIndex: selectedBot });
+    }
+  } else if (action === 'del-phrase') {
+    if (!isNaN(pi) && phrases[pi] !== undefined) {
+      await post('/api/phrases/delete', { group, phrase: phrases[pi] });
+    }
+  } else if (action === 'add-phrase') {
+    openModal('add-phrase', { group });
+  } else if (action === 'rename-group') {
+    openModal('rename-group', { group });
+  } else if (action === 'del-group') {
+    if (confirm(`Удалить группу "${group}"?`)) {
+      await post('/api/phrases/delete-group', { group });
+    }
+  }
+});
 
-// ─── Send ──────────────────────────────────────────────────
+document.getElementById('new-group-btn').addEventListener('click', () => openModal('new-group', {}));
+
+// ── Send ──────────────────────────────────────────
+document.getElementById('bsel').addEventListener('change', function() {
+  selectedBot = parseInt(this.value) || 0;
+});
+
 async function sendMsg() {
   const inp = document.getElementById('minp');
   let text = inp.value.trim();
   if (!text) return;
-  if (replyTo) text = `@${replyTo} ${text}`;
+  if (replyTo) { text = '@' + replyTo + ' ' + text; }
   inp.value = '';
   clearReply();
-  await api('/api/send', { message: text, botIndex: selectedBotIdx });
+  await post('/api/send', { message: text, botIndex: selectedBot });
 }
+
+document.getElementById('sendbtn').addEventListener('click', sendMsg);
+document.getElementById('minp').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
 
 function setReply(name) {
   replyTo = name;
   document.getElementById('rbar').classList.remove('hidden');
-  document.getElementById('rlabel').textContent = `Ответ для @${name}`;
+  document.getElementById('rlabel').textContent = 'Ответ для @' + name;
   document.getElementById('minp').focus();
 }
-
 function clearReply() {
   replyTo = null;
   document.getElementById('rbar').classList.add('hidden');
 }
+document.getElementById('rx').addEventListener('click', clearReply);
 
-// ─── Chat rendering ────────────────────────────────────────
+// ── Chat ──────────────────────────────────────────
 function addMsg(type, name, text, canReply) {
   const chat = document.getElementById('chat');
-  const t = new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
-  const init = name.slice(0,2).toUpperCase();
-  const esc = s => s.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const rb = canReply ? `<button class="mbtn" onclick="setReply(${JSON.stringify(name)})">↩ ответить</button>` : '';
-  chat.insertAdjacentHTML('beforeend',`
+  const rb = canReply
+    ? `<button class="mbtn reply-btn" data-name="${esc(name)}">↩ ответить</button>`
+    : '';
+  chat.insertAdjacentHTML('beforeend', `
     <div class="msg">
-      <div class="mav ${type}">${init}</div>
+      <div class="mav ${type}">${esc(name.slice(0,2).toUpperCase())}</div>
       <div class="mbody">
-        <div class="mmeta"><span class="mname ${type}">${esc(name)}</span><span class="mtime">${t}</span></div>
+        <div class="mmeta"><span class="mname ${type}">${esc(name)}</span><span class="mtime">${now()}</span></div>
         <div class="mtext">${esc(text)}</div>
         <div class="mact">${rb}</div>
       </div>
     </div>`);
   chat.scrollTop = chat.scrollHeight;
-  document.getElementById('mcnt').textContent = (++mcnt)+' сообщений';
+  document.getElementById('mcnt').textContent = (++mcnt) + ' сообщений';
 }
+
+document.getElementById('chat').addEventListener('click', e => {
+  const btn = e.target.closest('.reply-btn');
+  if (btn) setReply(btn.dataset.name);
+});
 
 function addTranscript(text) {
   document.getElementById('notr').style.display = 'none';
   const area = document.getElementById('trarea');
-  const t = new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  area.insertAdjacentHTML('afterbegin',`<div class="tr-item">${text.replace(/</g,'&lt;')}<div class="tr-t">${t}</div></div>`);
+  const t = new Date().toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  area.insertAdjacentHTML('afterbegin',
+    `<div class="tr-item">${esc(text)}<div class="tr-t">${t}</div></div>`);
   const items = area.querySelectorAll('.tr-item');
   if (items.length > 20) items[items.length-1].remove();
 }
 
-// ─── Modal ─────────────────────────────────────────────────
-function openModal(mode, data={}) {
-  modalMode = mode; modalData = data;
+// ── Modal ─────────────────────────────────────────
+function openModal(mode, ctx) {
+  modalMode = mode; modalCtx = ctx;
   const titles = {
-    'add-phrase': `Добавить фразу в "${data.group}"`,
-    'new-group': 'Новая группа фраз',
-    'rename-group': `Переименовать "${data.group}"`
+    'add-phrase': `Новая фраза → ${ctx.group}`,
+    'new-group': 'Новая группа',
+    'rename-group': `Переименовать: ${ctx.group}`
   };
-  document.getElementById('mtitle').textContent = titles[mode] || 'Действие';
+  document.getElementById('mtitle').textContent = titles[mode] || '';
   const i1 = document.getElementById('mi1');
   const i2 = document.getElementById('mi2');
+  i2.style.display = 'none';
   if (mode === 'add-phrase') {
     i1.placeholder = 'Текст фразы'; i1.value = '';
-    i2.style.display = 'none';
+    document.getElementById('mok').textContent = 'Добавить';
   } else if (mode === 'new-group') {
     i1.placeholder = 'Название группы'; i1.value = '';
-    i2.placeholder = 'Первая фраза (необязательно)'; i2.value = ''; i2.style.display = '';
+    i2.placeholder = 'Первая фраза'; i2.value = ''; i2.style.display = '';
+    document.getElementById('mok').textContent = 'Создать';
   } else if (mode === 'rename-group') {
-    i1.placeholder = 'Новое название'; i1.value = data.group;
-    i2.style.display = 'none';
+    i1.placeholder = 'Новое название'; i1.value = ctx.group;
+    document.getElementById('mok').textContent = 'Сохранить';
   }
   document.getElementById('modal').classList.remove('hidden');
-  setTimeout(()=>i1.focus(), 50);
+  setTimeout(() => i1.focus(), 50);
 }
-
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
 async function modalOk() {
   const v1 = document.getElementById('mi1').value.trim();
   const v2 = document.getElementById('mi2').value.trim();
   if (!v1) return;
   if (modalMode === 'add-phrase') {
-    await api('/api/phrases/add', { group: modalData.group, phrase: v1 });
+    await post('/api/phrases/add', { group: modalCtx.group, phrase: v1 });
   } else if (modalMode === 'new-group') {
-    if (v2) await api('/api/phrases/add', { group: v1, phrase: v2 });
-    else await api('/api/phrases/add', { group: v1, phrase: '...' });
+    await post('/api/phrases/add', { group: v1, phrase: v2 || '...' });
   } else if (modalMode === 'rename-group') {
-    await api('/api/phrases/rename-group', { oldName: modalData.group, newName: v1 });
+    await post('/api/phrases/rename-group', { oldName: modalCtx.group, newName: v1 });
   }
-  closeModal();
+  document.getElementById('modal').classList.add('hidden');
 }
 
-// Enter в модалке
+document.getElementById('mcancel').addEventListener('click', () =>
+  document.getElementById('modal').classList.add('hidden'));
+document.getElementById('mok').addEventListener('click', modalOk);
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') document.getElementById('modal').classList.add('hidden');
   if (e.key === 'Enter' && !document.getElementById('modal').classList.contains('hidden')) modalOk();
 });
 
-// ─── Socket events ─────────────────────────────────────────
+// ── Socket ────────────────────────────────────────
 socket.on('bot-sent', d => {
-  const bname = botList[d.botIndex]?.username || 'Бот';
-  addMsg('bot', bname, d.message, false);
+  const name = botList[d.botIndex]?.username || 'Бот';
+  addMsg('bot', name, d.message, false);
 });
 
 socket.on('incoming-chat', d => {
@@ -402,10 +428,15 @@ socket.on('incoming-chat', d => {
 });
 
 socket.on('transcription', d => addTranscript(d.text));
-socket.on('phrases-updated', groups => renderPhrases(groups));
+
+socket.on('phrases-updated', groups => {
+  phraseData = groups;
+  renderPhrases(groups);
+});
+
 socket.on('bot-state', () => loadStatus());
 
-// ─── Start ─────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────
 loadStatus();
 setInterval(loadStatus, 30000);
 setTimeout(() => addMsg('system', 'СИСТЕМА', 'Дашборд подключён', false), 300);
