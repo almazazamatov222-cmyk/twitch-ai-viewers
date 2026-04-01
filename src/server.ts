@@ -15,28 +15,22 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '../public')));
 
-  // Состояние ботов
-  const botStates: Record<string, boolean> = {};
+  const botStates: Record<number, boolean> = {};
   const phraseGroups: Record<string, string[]> = {
     'Приветствия': ['Привет стрим!', 'О, живой!', 'Хей!', 'Здарова!'],
     'Реакции': ['ЛОООЛ', 'ахахах', 'ну ты дал', 'топ момент', 'КЛАссс'],
     'Вопросы': ['какая игра?', 'что играем?', 'сколько часов уже?'],
   };
 
-  // Инициализируем состояние ботов
-  bots.forEach((bot, i) => {
-    const name = bot.client?.getUsername?.() || `Bot${i + 1}`;
-    botStates[name] = true;
-  });
+  bots.forEach((_, i) => { botStates[i] = true; });
 
-  // REST API
   app.get('/api/status', (req, res) => {
     res.json({
       channel: process.env.TWITCH_CHANNEL,
       bots: bots.map((bot, i) => ({
-        username: bot.client?.getUsername?.() || `Bot${i + 1}`,
+        username: bot.getUsername?.() || `Bot${i + 1}`,
         connected: bot.isBotConnected?.() || false,
-        enabled: botStates[bot.client?.getUsername?.() || `Bot${i + 1}`] ?? true,
+        enabled: botStates[i] ?? true,
       })),
       channelInfo: aiService.currentChannelInfo,
       phraseGroups,
@@ -44,26 +38,27 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
   });
 
   app.post('/api/send', (req, res) => {
-    const { botIndex, message } = req.body;
+    const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'No message' });
-    try {
-      const bot = bots[botIndex || 0];
-      if (!bot) return res.status(404).json({ error: 'Bot not found' });
-      aiService.emit('message', message);
-      io.emit('chat', { from: 'dashboard', bot: botIndex || 0, message, time: Date.now() });
-      res.json({ ok: true });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    }
+    aiService.emit('message', message);
+    res.json({ ok: true });
   });
 
-  app.post('/api/phrase', (req, res) => {
+  // Случайная из группы
+  app.post('/api/phrase/random', (req, res) => {
     const { group } = req.body;
     const phrases = phraseGroups[group];
-    if (!phrases) return res.status(404).json({ error: 'Group not found' });
+    if (!phrases || phrases.length === 0) return res.status(404).json({ error: 'Group not found' });
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
     aiService.emit('message', phrase);
-    io.emit('chat', { from: 'phrase', group, message: phrase, time: Date.now() });
+    res.json({ ok: true, phrase });
+  });
+
+  // Конкретная фраза
+  app.post('/api/phrase/exact', (req, res) => {
+    const { phrase } = req.body;
+    if (!phrase) return res.status(400).json({ error: 'No phrase' });
+    aiService.emit('message', phrase);
     res.json({ ok: true, phrase });
   });
 
@@ -71,37 +66,39 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     const { botIndex } = req.body;
     const bot = bots[botIndex];
     if (!bot) return res.status(404).json({ error: 'Bot not found' });
-    const name = bot.client?.getUsername?.() || `Bot${botIndex}`;
-    botStates[name] = !botStates[name];
-    if (botStates[name]) {
-      bot.connect?.();
-    } else {
-      bot.disconnect?.();
-    }
-    io.emit('bot-state', { botIndex, enabled: botStates[name] });
-    res.json({ ok: true, enabled: botStates[name] });
+    botStates[botIndex] = !botStates[botIndex];
+    botStates[botIndex] ? bot.connect?.() : bot.disconnect?.();
+    io.emit('bot-state', { botIndex, enabled: botStates[botIndex] });
+    res.json({ ok: true, enabled: botStates[botIndex] });
   });
 
   app.post('/api/phrases/add', (req, res) => {
     const { group, phrase } = req.body;
+    if (!group || !phrase) return res.status(400).json({ error: 'Missing data' });
     if (!phraseGroups[group]) phraseGroups[group] = [];
     phraseGroups[group].push(phrase);
     io.emit('phrases-updated', phraseGroups);
     res.json({ ok: true });
   });
 
-  // Socket.io — трансляция событий AI в дашборд
+  // Бот отправил сообщение → показываем в дашборде
+  aiService.on('message', (message: string) => {
+    io.emit('bot-sent', { message, time: Date.now() });
+  });
+
+  // Транскрипция
   aiService.on('transcription', (text: string) => {
     io.emit('transcription', { text, time: Date.now() });
   });
 
-  aiService.on('message', (message: string) => {
-    io.emit('bot-message', { message, time: Date.now() });
+  // Входящие сообщения из Twitch
+  aiService.on('incomingChat', (data: any) => {
+    io.emit('incoming-chat', data);
   });
 
   const PORT = parseInt(process.env.PORT || '3000');
   httpServer.listen(PORT, () => {
-    logger.info(`Dashboard running at http://localhost:${PORT}`);
+    logger.info(`Dashboard running at port ${PORT}`);
   });
 
   return { app, io };
