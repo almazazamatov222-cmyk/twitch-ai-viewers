@@ -13,12 +13,20 @@ interface BotConfig {
 export class Bot {
   private client: tmi.Client | null = null;
   private aiService: AIService;
-  private lastMessageTime: number = 0;
   private messageCount: number = 0;
   private shouldHandleVoiceCapture: boolean;
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
+
+  // Ручные сообщения — минимальная пауза (300мс чтобы Twitch не дублировал)
+  private manualQueue: string[] = [];
+  private isSendingManual: boolean = false;
+  private readonly MANUAL_DELAY = 300;
+
+  // AI сообщения — пауза из настроек
+  private aiQueue: string[] = [];
+  private isSendingAI: boolean = false;
 
   constructor(config: BotConfig) {
     this.aiService = config.aiService;
@@ -51,10 +59,10 @@ export class Bot {
       if (self) return;
 
       const username = tags['display-name'] || tags.username || 'viewer';
-      const channelName = process.env.TWITCH_CHANNEL?.toLowerCase().replace('https://www.twitch.tv/', '');
+      const channelName = process.env.TWITCH_CHANNEL?.toLowerCase()
+        .replace('https://www.twitch.tv/', '').replace(/\/$/, '');
       const isStreamer = tags.username?.toLowerCase() === channelName;
 
-      // Пробрасываем ВСЕ входящие сообщения на дашборд
       this.aiService.emit('incomingChat', {
         username,
         message,
@@ -67,7 +75,6 @@ export class Bot {
           streamInfo: this.aiService.currentChannelInfo,
           chatMessage: message,
           username,
-          timeSinceLastMessage: Date.now() - this.lastMessageTime,
           messageCount: this.messageCount,
           isChatMessage: true,
         };
@@ -82,7 +89,7 @@ export class Bot {
     this.client.on('connected', (address: string, port: number) => {
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      logger.info(`Bot ${this.client?.getUsername()} connected to chat at ${address}:${port}`);
+      logger.info(`Bot ${this.client?.getUsername()} connected at ${address}:${port}`);
     });
 
     this.client.on('disconnected', (reason: string) => {
@@ -92,28 +99,75 @@ export class Bot {
 
     this.client.on('reconnect', () => {
       this.reconnectAttempts++;
-      logger.info(`Bot ${this.client?.getUsername()} reconnecting (${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`);
     });
 
     this.client.on('logon', () => {
-      logger.info(`Bot ${this.client?.getUsername()} successfully logged in`);
+      logger.info(`Bot ${this.client?.getUsername()} logged in`);
     });
 
-    this.aiService.on('message', (message: string) => {
-      if (message && message.trim() !== '') {
-        const now = Date.now();
-        if (now - this.lastMessageTime >= 5000) {
-          logger.info('Sending message:', message);
-          this.sendMessage(message).catch(error => {
-            logger.error(`Error sending message from ${this.client?.getUsername()}:`, error);
-          });
-          this.messageCount++;
-          this.lastMessageTime = now;
-        } else {
-          logger.info('Skipping message - too soon since last message');
-        }
+    // РУЧНОЕ сообщение — быстрая очередь без задержки
+    this.aiService.on('manualMessage', (message: string) => {
+      if (message && message.trim()) {
+        this.manualQueue.push(message);
+        logger.info(`Manual message queued: "${message}"`);
+        this.processManualQueue();
       }
     });
+
+    // AI сообщение — медленная очередь с задержкой из настроек
+    this.aiService.on('message', (message: string) => {
+      if (message && message.trim()) {
+        this.aiQueue.push(message);
+        logger.info(`AI message queued. Queue length: ${this.aiQueue.length}`);
+        this.processAIQueue();
+      }
+    });
+  }
+
+  // Быстрая очередь для ручных сообщений
+  private async processManualQueue(): Promise<void> {
+    if (this.isSendingManual || this.manualQueue.length === 0) return;
+    this.isSendingManual = true;
+
+    while (this.manualQueue.length > 0) {
+      const message = this.manualQueue.shift()!;
+      try {
+        await this.sendMessage(message);
+        this.messageCount++;
+        logger.info(`Manual message sent: "${message}"`);
+      } catch (error) {
+        logger.error(`Error sending manual message:`, error);
+      }
+      if (this.manualQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.MANUAL_DELAY));
+      }
+    }
+
+    this.isSendingManual = false;
+  }
+
+  // Медленная очередь для AI сообщений
+  private async processAIQueue(): Promise<void> {
+    if (this.isSendingAI || this.aiQueue.length === 0) return;
+    this.isSendingAI = true;
+
+    const aiDelay = parseInt(process.env.MESSAGE_INTERVAL || '5000');
+
+    while (this.aiQueue.length > 0) {
+      const message = this.aiQueue.shift()!;
+      try {
+        await this.sendMessage(message);
+        this.messageCount++;
+        logger.info(`AI message sent: "${message}"`);
+      } catch (error) {
+        logger.error(`Error sending AI message:`, error);
+      }
+      if (this.aiQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, aiDelay));
+      }
+    }
+
+    this.isSendingAI = false;
   }
 
   private async setupVoiceCapture(channel: string): Promise<void> {
@@ -126,7 +180,7 @@ export class Bot {
         attempts++;
       }
       if (this.aiService.currentChannelInfo) {
-        logger.info('Channel info available:', {
+        logger.info('Channel info ready:', {
           title: this.aiService.currentChannelInfo.title,
           game: this.aiService.currentChannelInfo.gameName,
         });
@@ -146,6 +200,7 @@ export class Bot {
       await this.client.say(`#${channelName}`, message);
     } catch (error) {
       logger.error(`Error sending message from ${this.client?.getUsername()}:`, error);
+      throw error;
     }
   }
 
@@ -159,7 +214,8 @@ export class Bot {
 
   public disconnect(): void {
     if (!this.client) return;
-    logger.info(`Disconnecting bot ${this.client.getUsername()}...`);
+    this.manualQueue = [];
+    this.aiQueue = [];
     try {
       this.client.disconnect();
       this.aiService.stopVoiceCapture();

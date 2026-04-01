@@ -37,28 +37,29 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     });
   });
 
+  // Ручная отправка → manualMessage (без задержки)
   app.post('/api/send', (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'No message' });
-    aiService.emit('message', message);
+    aiService.emit('manualMessage', message);
     res.json({ ok: true });
   });
 
-  // Случайная из группы
+  // Случайная из группы → manualMessage
   app.post('/api/phrase/random', (req, res) => {
     const { group } = req.body;
     const phrases = phraseGroups[group];
     if (!phrases || phrases.length === 0) return res.status(404).json({ error: 'Group not found' });
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-    aiService.emit('message', phrase);
+    aiService.emit('manualMessage', phrase);
     res.json({ ok: true, phrase });
   });
 
-  // Конкретная фраза
+  // Точная фраза → manualMessage
   app.post('/api/phrase/exact', (req, res) => {
     const { phrase } = req.body;
     if (!phrase) return res.status(400).json({ error: 'No phrase' });
-    aiService.emit('message', phrase);
+    aiService.emit('manualMessage', phrase);
     res.json({ ok: true, phrase });
   });
 
@@ -81,9 +82,16 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ ok: true });
   });
 
-  // Бот отправил сообщение → показываем в дашборде
+  // Socket события
+
+  // Ручное сообщение отправлено → показываем в дашборде
+  aiService.on('manualMessage', (message: string) => {
+    io.emit('bot-sent', { message, manual: true, time: Date.now() });
+  });
+
+  // AI сообщение отправлено → показываем в дашборде
   aiService.on('message', (message: string) => {
-    io.emit('bot-sent', { message, time: Date.now() });
+    io.emit('bot-sent', { message, manual: false, time: Date.now() });
   });
 
   // Транскрипция
