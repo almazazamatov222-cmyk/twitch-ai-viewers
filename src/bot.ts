@@ -8,6 +8,7 @@ interface BotConfig {
   channel: string;
   aiService: AIService;
   shouldHandleVoiceCapture?: boolean;
+  botIndex: number;
 }
 
 export class Bot {
@@ -18,22 +19,24 @@ export class Bot {
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private botIndex: number;
 
-  // Ручные сообщения — минимальная пауза (300мс чтобы Twitch не дублировал)
+  // Ручные сообщения — минимальная пауза 300мс
   private manualQueue: string[] = [];
   private isSendingManual: boolean = false;
   private readonly MANUAL_DELAY = 300;
 
-  // AI сообщения — пауза из настроек
+  // AI сообщения — пауза из MESSAGE_INTERVAL
   private aiQueue: string[] = [];
   private isSendingAI: boolean = false;
 
   constructor(config: BotConfig) {
     this.aiService = config.aiService;
     this.shouldHandleVoiceCapture = config.shouldHandleVoiceCapture || false;
+    this.botIndex = config.botIndex;
 
     if (!config.oauth.startsWith('oauth:')) {
-      throw new Error(`Invalid OAuth token format for bot ${config.username}. Token must start with 'oauth:'`);
+      throw new Error(`Invalid OAuth token for bot ${config.username}. Must start with 'oauth:'`);
     }
 
     this.client = new tmi.Client({
@@ -55,34 +58,25 @@ export class Bot {
   private setupEventHandlers(): void {
     if (!this.client) return;
 
-    this.client.on('message', async (channel: string, tags: tmi.ChatUserstate, message: string, self: boolean) => {
+    this.client.on('message', async (_channel: string, tags: tmi.ChatUserstate, message: string, self: boolean) => {
       if (self) return;
 
       const username = tags['display-name'] || tags.username || 'viewer';
-      const channelName = process.env.TWITCH_CHANNEL?.toLowerCase()
-        .replace('https://www.twitch.tv/', '').replace(/\/$/, '');
+      const channelName = (process.env.TWITCH_CHANNEL || '')
+        .toLowerCase().replace('https://www.twitch.tv/', '').replace(/\/$/, '');
       const isStreamer = tags.username?.toLowerCase() === channelName;
 
-      this.aiService.emit('incomingChat', {
-        username,
-        message,
-        isStreamer,
-        color: tags.color || null
-      });
+      // Только первый бот пробрасывает входящие (чтобы не дублировать)
+      if (this.botIndex === 0) {
+        this.aiService.emit('incomingChat', { username, message, isStreamer, color: tags.color || null });
+      }
 
-      try {
+      if (Math.random() < 0.2) {
         const context = {
-          streamInfo: this.aiService.currentChannelInfo,
-          chatMessage: message,
-          username,
-          messageCount: this.messageCount,
-          isChatMessage: true,
+          chatMessage: message, username,
+          messageCount: this.messageCount, isChatMessage: true,
         };
-        if (Math.random() < 0.2) {
-          this.aiService.emit('chatMessage', JSON.stringify(context));
-        }
-      } catch (error) {
-        logger.error(`Error handling message:`, error);
+        this.aiService.emit('chatMessage', JSON.stringify(context));
       }
     });
 
@@ -97,76 +91,55 @@ export class Bot {
       logger.warn(`Bot ${this.client?.getUsername()} disconnected: ${reason}`);
     });
 
-    this.client.on('reconnect', () => {
-      this.reconnectAttempts++;
-    });
-
     this.client.on('logon', () => {
       logger.info(`Bot ${this.client?.getUsername()} logged in`);
     });
 
-    // РУЧНОЕ сообщение — быстрая очередь без задержки
-    this.aiService.on('manualMessage', (message: string) => {
-      if (message && message.trim()) {
+    // Каждый бот слушает СВОЙ event: manualMessage_0, manualMessage_1, ...
+    this.aiService.on(`manualMessage_${this.botIndex}`, (message: string) => {
+      if (message?.trim()) {
         this.manualQueue.push(message);
-        logger.info(`Manual message queued: "${message}"`);
         this.processManualQueue();
       }
     });
 
-    // AI сообщение — медленная очередь с задержкой из настроек
-    this.aiService.on('message', (message: string) => {
-      if (message && message.trim()) {
-        this.aiQueue.push(message);
-        logger.info(`AI message queued. Queue length: ${this.aiQueue.length}`);
-        this.processAIQueue();
-      }
-    });
+    // AI сообщения — только первый бот отправляет
+    if (this.botIndex === 0) {
+      this.aiService.on('message', (message: string) => {
+        if (message?.trim()) {
+          this.aiQueue.push(message);
+          this.processAIQueue();
+        }
+      });
+    }
   }
 
-  // Быстрая очередь для ручных сообщений
   private async processManualQueue(): Promise<void> {
     if (this.isSendingManual || this.manualQueue.length === 0) return;
     this.isSendingManual = true;
-
     while (this.manualQueue.length > 0) {
-      const message = this.manualQueue.shift()!;
+      const msg = this.manualQueue.shift()!;
       try {
-        await this.sendMessage(message);
+        await this.sendMessage(msg);
         this.messageCount++;
-        logger.info(`Manual message sent: "${message}"`);
-      } catch (error) {
-        logger.error(`Error sending manual message:`, error);
-      }
-      if (this.manualQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.MANUAL_DELAY));
-      }
+      } catch (e) { logger.error('Manual send error:', e); }
+      if (this.manualQueue.length > 0) await new Promise(r => setTimeout(r, this.MANUAL_DELAY));
     }
-
     this.isSendingManual = false;
   }
 
-  // Медленная очередь для AI сообщений
   private async processAIQueue(): Promise<void> {
     if (this.isSendingAI || this.aiQueue.length === 0) return;
     this.isSendingAI = true;
-
     const aiDelay = parseInt(process.env.MESSAGE_INTERVAL || '5000');
-
     while (this.aiQueue.length > 0) {
-      const message = this.aiQueue.shift()!;
+      const msg = this.aiQueue.shift()!;
       try {
-        await this.sendMessage(message);
+        await this.sendMessage(msg);
         this.messageCount++;
-        logger.info(`AI message sent: "${message}"`);
-      } catch (error) {
-        logger.error(`Error sending AI message:`, error);
-      }
-      if (this.aiQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, aiDelay));
-      }
+      } catch (e) { logger.error('AI send error:', e); }
+      if (this.aiQueue.length > 0) await new Promise(r => setTimeout(r, aiDelay));
     }
-
     this.isSendingAI = false;
   }
 
@@ -174,17 +147,6 @@ export class Bot {
     logger.info(`Setting up voice capture for channel: ${channel}`);
     try {
       await this.aiService.startVoiceCapture(channel);
-      let attempts = 0;
-      while (!this.aiService.currentChannelInfo && attempts < 5) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        attempts++;
-      }
-      if (this.aiService.currentChannelInfo) {
-        logger.info('Channel info ready:', {
-          title: this.aiService.currentChannelInfo.title,
-          game: this.aiService.currentChannelInfo.gameName,
-        });
-      }
     } catch (error) {
       logger.error('Error setting up voice capture:', error);
     }
@@ -192,43 +154,24 @@ export class Bot {
 
   private async sendMessage(message: string): Promise<void> {
     if (!this.client || !message) return;
-    try {
-      const channelUrl = process.env.TWITCH_CHANNEL!;
-      const channelName = channelUrl.includes('twitch.tv/')
-        ? channelUrl.split('twitch.tv/')[1].split('/')[0].split('?')[0]
-        : channelUrl;
-      await this.client.say(`#${channelName}`, message);
-    } catch (error) {
-      logger.error(`Error sending message from ${this.client?.getUsername()}:`, error);
-      throw error;
-    }
+    const channelUrl = process.env.TWITCH_CHANNEL!;
+    const channelName = channelUrl.includes('twitch.tv/')
+      ? channelUrl.split('twitch.tv/')[1].split('/')[0].split('?')[0]
+      : channelUrl;
+    await this.client.say(`#${channelName}`, message);
   }
 
   public connect(): void {
     if (!this.client) return;
-    logger.info(`Connecting bot ${this.client.getUsername()}...`);
-    this.client.connect().catch((error: Error) => {
-      logger.error(`Failed to connect bot ${this.client?.getUsername()}:`, error);
-    });
+    this.client.connect().catch((e: Error) => logger.error(`Connect error:`, e));
   }
 
   public disconnect(): void {
-    if (!this.client) return;
     this.manualQueue = [];
     this.aiQueue = [];
-    try {
-      this.client.disconnect();
-      this.aiService.stopVoiceCapture();
-    } catch (error) {
-      logger.error(`Error disconnecting bot ${this.client.getUsername()}:`, error);
-    }
+    try { this.client?.disconnect(); } catch (e) { }
   }
 
-  public isBotConnected(): boolean {
-    return this.isConnected;
-  }
-
-  public getUsername(): string {
-    return this.client?.getUsername() || '';
-  }
+  public isBotConnected(): boolean { return this.isConnected; }
+  public getUsername(): string { return this.client?.getUsername() || ''; }
 }

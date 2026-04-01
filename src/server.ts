@@ -24,7 +24,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
 
   bots.forEach((_, i) => { botStates[i] = true; });
 
-  app.get('/api/status', (req, res) => {
+  app.get('/api/status', (_req, res) => {
     res.json({
       channel: process.env.TWITCH_CHANNEL,
       bots: bots.map((bot, i) => ({
@@ -37,30 +37,72 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     });
   });
 
-  // Ручная отправка → manualMessage (без задержки)
+  // Ручная отправка — с указанием botIndex
   app.post('/api/send', (req, res) => {
-    const { message } = req.body;
+    const { message, botIndex = 0 } = req.body;
     if (!message) return res.status(400).json({ error: 'No message' });
-    aiService.emit('manualMessage', message);
+    aiService.emit(`manualMessage_${botIndex}`, message);
+    io.emit('bot-sent', { message, botIndex, manual: true, time: Date.now() });
     res.json({ ok: true });
   });
 
-  // Случайная из группы → manualMessage
+  // Случайная фраза из группы — с botIndex
   app.post('/api/phrase/random', (req, res) => {
-    const { group } = req.body;
+    const { group, botIndex = 0 } = req.body;
     const phrases = phraseGroups[group];
-    if (!phrases || phrases.length === 0) return res.status(404).json({ error: 'Group not found' });
+    if (!phrases?.length) return res.status(404).json({ error: 'Group not found' });
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-    aiService.emit('manualMessage', phrase);
+    aiService.emit(`manualMessage_${botIndex}`, phrase);
+    io.emit('bot-sent', { message: phrase, botIndex, manual: true, time: Date.now() });
     res.json({ ok: true, phrase });
   });
 
-  // Точная фраза → manualMessage
+  // Точная фраза — с botIndex
   app.post('/api/phrase/exact', (req, res) => {
-    const { phrase } = req.body;
+    const { phrase, botIndex = 0 } = req.body;
     if (!phrase) return res.status(400).json({ error: 'No phrase' });
-    aiService.emit('manualMessage', phrase);
-    res.json({ ok: true, phrase });
+    aiService.emit(`manualMessage_${botIndex}`, phrase);
+    io.emit('bot-sent', { message: phrase, botIndex, manual: true, time: Date.now() });
+    res.json({ ok: true });
+  });
+
+  // Добавить фразу в группу
+  app.post('/api/phrases/add', (req, res) => {
+    const { group, phrase } = req.body;
+    if (!group || !phrase) return res.status(400).json({ error: 'Missing data' });
+    if (!phraseGroups[group]) phraseGroups[group] = [];
+    phraseGroups[group].push(phrase);
+    io.emit('phrases-updated', phraseGroups);
+    res.json({ ok: true });
+  });
+
+  // Удалить фразу
+  app.post('/api/phrases/delete', (req, res) => {
+    const { group, phrase } = req.body;
+    if (!phraseGroups[group]) return res.status(404).json({ error: 'Group not found' });
+    phraseGroups[group] = phraseGroups[group].filter(p => p !== phrase);
+    if (phraseGroups[group].length === 0) delete phraseGroups[group];
+    io.emit('phrases-updated', phraseGroups);
+    res.json({ ok: true });
+  });
+
+  // Переименовать группу
+  app.post('/api/phrases/rename-group', (req, res) => {
+    const { oldName, newName } = req.body;
+    if (!phraseGroups[oldName] || !newName) return res.status(400).json({ error: 'Invalid' });
+    phraseGroups[newName] = phraseGroups[oldName];
+    delete phraseGroups[oldName];
+    io.emit('phrases-updated', phraseGroups);
+    res.json({ ok: true });
+  });
+
+  // Удалить группу
+  app.post('/api/phrases/delete-group', (req, res) => {
+    const { group } = req.body;
+    if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
+    delete phraseGroups[group];
+    io.emit('phrases-updated', phraseGroups);
+    res.json({ ok: true });
   });
 
   app.post('/api/toggle-bot', (req, res) => {
@@ -73,41 +115,21 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ ok: true, enabled: botStates[botIndex] });
   });
 
-  app.post('/api/phrases/add', (req, res) => {
-    const { group, phrase } = req.body;
-    if (!group || !phrase) return res.status(400).json({ error: 'Missing data' });
-    if (!phraseGroups[group]) phraseGroups[group] = [];
-    phraseGroups[group].push(phrase);
-    io.emit('phrases-updated', phraseGroups);
-    res.json({ ok: true });
-  });
-
-  // Socket события
-
-  // Ручное сообщение отправлено → показываем в дашборде
-  aiService.on('manualMessage', (message: string) => {
-    io.emit('bot-sent', { message, manual: true, time: Date.now() });
-  });
-
-  // AI сообщение отправлено → показываем в дашборде
+  // AI написал
   aiService.on('message', (message: string) => {
-    io.emit('bot-sent', { message, manual: false, time: Date.now() });
+    io.emit('bot-sent', { message, botIndex: 0, manual: false, time: Date.now() });
   });
 
-  // Транскрипция
   aiService.on('transcription', (text: string) => {
     io.emit('transcription', { text, time: Date.now() });
   });
 
-  // Входящие сообщения из Twitch
   aiService.on('incomingChat', (data: any) => {
     io.emit('incoming-chat', data);
   });
 
   const PORT = parseInt(process.env.PORT || '3000');
-  httpServer.listen(PORT, () => {
-    logger.info(`Dashboard running at port ${PORT}`);
-  });
+  httpServer.listen(PORT, () => logger.info(`Dashboard at port ${PORT}`));
 
   return { app, io };
 }

@@ -63,7 +63,8 @@ async function main() {
           oauth: credentials.oauth,
           channel: channelName,
           aiService,
-          shouldHandleVoiceCapture: i === 0
+          shouldHandleVoiceCapture: i === 0,
+          botIndex: i
         });
         bots.push(bot);
         bot.connect();
