@@ -7,7 +7,10 @@ import fs from 'fs';
 import { AIService } from './ai';
 import { logger } from './logger';
 
-const PHRASES_FILE = path.join('/tmp', 'phrases.json');
+// Railway Volume: mount /data в Settings → Volumes
+// Fallback: /tmp (сессия), иначе дефолт
+const DATA_DIR = fs.existsSync('/data') ? '/data' : '/tmp';
+const PHRASES_FILE = path.join(DATA_DIR, 'phrases.json');
 
 const DEFAULT_PHRASES: Record<string, string[]> = {
   'Приветствия': ['Привет стрим!', 'О, живой!', 'Хей!', 'Здарова!'],
@@ -19,11 +22,11 @@ function loadPhrases(): Record<string, string[]> {
   try {
     if (fs.existsSync(PHRASES_FILE)) {
       const data = JSON.parse(fs.readFileSync(PHRASES_FILE, 'utf-8'));
-      logger.info('Loaded phrases from file');
+      logger.info(`Loaded phrases from ${PHRASES_FILE}`);
       return data;
     }
   } catch (e) {
-    logger.warn('Could not load phrases file, using defaults');
+    logger.warn('Could not load phrases, using defaults');
   }
   return JSON.parse(JSON.stringify(DEFAULT_PHRASES));
 }
@@ -31,8 +34,9 @@ function loadPhrases(): Record<string, string[]> {
 function savePhrases(groups: Record<string, string[]>): void {
   try {
     fs.writeFileSync(PHRASES_FILE, JSON.stringify(groups, null, 2));
+    logger.info(`Phrases saved to ${PHRASES_FILE}`);
   } catch (e) {
-    logger.warn('Could not save phrases file:', e);
+    logger.warn('Could not save phrases:', e);
   }
 }
 
@@ -48,8 +52,11 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
   const botStates: Record<number, boolean> = {};
   bots.forEach((_, i) => { botStates[i] = true; });
 
-  // Load phrases from file (persists across deploys if /tmp survives, or defaults)
   const phraseGroups = loadPhrases();
+
+  // Dedup incoming chat messages (all bots forward, we filter by ID)
+  const seenMessages = new Set<string>();
+  const SEEN_TTL = 5000; // 5 seconds
 
   app.get('/api/status', (_req, res) => {
     res.json({
@@ -62,23 +69,20 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
       })),
       channelInfo: aiService.currentChannelInfo,
       phraseGroups,
+      storageInfo: DATA_DIR === '/data' ? 'Railway Volume ✓' : 'Временное хранилище (добавь Volume в Railway для постоянного)'
     });
   });
 
-  // Manual message from dashboard — routes to specific bot by index
   app.post('/api/send', (req, res) => {
     const { message, botIndex = 0 } = req.body;
     if (!message) return res.status(400).json({ error: 'No message' });
-    const idx = parseInt(botIndex) || 0;
-    logger.info(`Dashboard send: botIndex=${idx} message="${message}"`);
+    const idx = parseInt(String(botIndex)) || 0;
+    logger.info(`Dashboard send: bot[${idx}] "${message}"`);
     aiService.emit(`manualMessage_${idx}`, message);
-    // Emit to dashboard immediately with correct bot info
     io.emit('bot-sent', {
-      message,
-      botIndex: idx,
+      message, botIndex: idx,
       botName: bots[idx]?.getUsername?.() || `Bot${idx + 1}`,
-      manual: true,
-      time: Date.now()
+      manual: true, time: Date.now()
     });
     res.json({ ok: true });
   });
@@ -88,7 +92,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     const phrases = phraseGroups[group];
     if (!phrases?.length) return res.status(404).json({ error: 'Group not found' });
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-    const idx = parseInt(botIndex) || 0;
+    const idx = parseInt(String(botIndex)) || 0;
     aiService.emit(`manualMessage_${idx}`, phrase);
     io.emit('bot-sent', {
       message: phrase, botIndex: idx,
@@ -101,7 +105,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
   app.post('/api/phrase/exact', (req, res) => {
     const { phrase, botIndex = 0 } = req.body;
     if (!phrase) return res.status(400).json({ error: 'No phrase' });
-    const idx = parseInt(botIndex) || 0;
+    const idx = parseInt(String(botIndex)) || 0;
     aiService.emit(`manualMessage_${idx}`, phrase);
     io.emit('bot-sent', {
       message: phrase, botIndex: idx,
@@ -123,9 +127,9 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
 
   app.post('/api/phrases/delete', (req, res) => {
     const { group, phrase } = req.body;
-    if (!phraseGroups[group]) return res.status(404).json({ error: 'Group not found' });
+    if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
     phraseGroups[group] = phraseGroups[group].filter(p => p !== phrase);
-    if (phraseGroups[group].length === 0) delete phraseGroups[group];
+    if (!phraseGroups[group].length) delete phraseGroups[group];
     savePhrases(phraseGroups);
     io.emit('phrases-updated', phraseGroups);
     res.json({ ok: true });
@@ -160,76 +164,18 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ ok: true, enabled: botStates[botIndex] });
   });
 
-  // Follow channel via Twitch API using bot's OAuth token
-  app.post('/api/follow', async (req, res) => {
-    const { botIndex = 0 } = req.body;
-    try {
-      const axios = require('axios');
-      const channelUrl = process.env.TWITCH_CHANNEL!;
-      const channelName = channelUrl.includes('twitch.tv/')
-        ? channelUrl.split('twitch.tv/')[1].split('/')[0].split('?')[0]
-        : channelUrl;
-
-      // Get bot's user ID
-      const botOauth = (process.env[`BOT${parseInt(botIndex)+1}_OAUTH_TOKEN`] ||
-                        process.env[`BOT${parseInt(botIndex)+1}_OAUTH`] || '')
-        .replace('oauth:', '');
-
-      if (!botOauth) return res.status(400).json({ error: 'No bot OAuth token' });
-
-      // Get channel user ID
-      const channelResp = await axios.get(
-        `https://api.twitch.tv/helix/users?login=${channelName}`,
-        { headers: { 'Client-ID': process.env.TWITCH_CLIENT_ID!, 'Authorization': `Bearer ${botOauth}` } }
-      );
-      const broadcasterId = channelResp.data.data[0]?.id;
-
-      // Get bot user ID
-      const botResp = await axios.get(
-        `https://api.twitch.tv/helix/users`,
-        { headers: { 'Client-ID': process.env.TWITCH_CLIENT_ID!, 'Authorization': `Bearer ${botOauth}` } }
-      );
-      const userId = botResp.data.data[0]?.id;
-
-      if (!broadcasterId || !userId) return res.status(400).json({ error: 'Could not get user IDs' });
-
-      // Follow
-      await axios.post(
-        `https://api.twitch.tv/helix/channels/followed`,
-        { broadcaster_id: broadcasterId, user_id: userId },
-        { headers: { 'Client-ID': process.env.TWITCH_CLIENT_ID!, 'Authorization': `Bearer ${botOauth}`, 'Content-Type': 'application/json' } }
-      );
-
-      const botName = bots[botIndex]?.getUsername?.() || `Bot${parseInt(botIndex)+1}`;
-      logger.info(`Bot ${botName} followed ${channelName}`);
-      res.json({ ok: true, botName, channel: channelName });
-    } catch (e: any) {
-      logger.error('Follow error:', e?.response?.data || e?.message);
-      res.status(500).json({ error: e?.response?.data?.message || 'Follow failed' });
-    }
+  // Deduplicated incoming chat forwarding
+  aiService.on('incomingChat', (data: any) => {
+    const msgId = data.id || `${data.username}-${data.message}`;
+    if (seenMessages.has(msgId)) return;
+    seenMessages.add(msgId);
+    setTimeout(() => seenMessages.delete(msgId), SEEN_TTL);
+    io.emit('incoming-chat', data);
   });
 
-  // Follow ALL bots
-  app.post('/api/follow-all', async (req, res) => {
-    const results = [];
-    for (let i = 0; i < bots.length; i++) {
-      try {
-        await fetch(`http://localhost:${process.env.PORT || 3000}/api/follow`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ botIndex: i })
-        });
-        results.push({ bot: bots[i]?.getUsername(), ok: true });
-      } catch (e) {
-        results.push({ bot: bots[i]?.getUsername(), ok: false });
-      }
-    }
-    res.json({ results });
-  });
-
-  // AI message event - include bot name
+  // AI generated message
   aiService.on('message', (message: string) => {
-    const botName = bots[0]?.getUsername?.() || 'Bot';
+    const botName = bots[0]?.getUsername?.() || 'Бот';
     io.emit('bot-sent', { message, botIndex: 0, botName, manual: false, time: Date.now() });
   });
 
@@ -237,11 +183,9 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     io.emit('transcription', { text, time: Date.now() });
   });
 
-  aiService.on('incomingChat', (data: any) => {
-    io.emit('incoming-chat', data);
-  });
-
   const PORT = parseInt(process.env.PORT || '3000');
-  httpServer.listen(PORT, () => logger.info(`Dashboard at port ${PORT}`));
+  httpServer.listen(PORT, () => {
+    logger.info(`Dashboard at port ${PORT} | Phrases storage: ${PHRASES_FILE}`);
+  });
   return { app, io };
 }

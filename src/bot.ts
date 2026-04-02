@@ -17,10 +17,9 @@ export class Bot {
   private messageCount: number = 0;
   private shouldHandleVoiceCapture: boolean;
   private isConnected: boolean = false;
-  private reconnectAttempts: number = 0;
-  private readonly MAX_RECONNECT_ATTEMPTS = 5;
   private botIndex: number;
   private channelName: string;
+  private readonly MAX_RECONNECT_ATTEMPTS = 5;
 
   private manualQueue: string[] = [];
   private isSendingManual: boolean = false;
@@ -58,25 +57,31 @@ export class Bot {
   private setupEventHandlers(): void {
     if (!this.client) return;
 
-    // Only first bot forwards incoming chat to dashboard (avoid duplicates)
-    if (this.botIndex === 0) {
-      this.client.on('message', (_ch, tags, message, self) => {
-        if (self) return;
-        const username = tags['display-name'] || tags.username || 'viewer';
-        const isStreamer = tags.username?.toLowerCase() === this.channelName.toLowerCase();
-        this.aiService.emit('incomingChat', { username, message, isStreamer, color: tags.color || null });
+    this.client.on('message', (_ch, tags, message, self) => {
+      if (self) return;
 
-        if (Math.random() < 0.2) {
-          this.aiService.emit('chatMessage', JSON.stringify({
-            chatMessage: message, username, messageCount: this.messageCount
-          }));
-        }
+      const username = tags['display-name'] || tags.username || 'viewer';
+      const channelLower = this.channelName.toLowerCase().replace('https://www.twitch.tv/', '').replace(/\/$/, '');
+      const isStreamer = tags.username?.toLowerCase() === channelLower;
+
+      // All bots forward chat — server deduplicates by message ID
+      this.aiService.emit('incomingChat', {
+        id: tags.id || `${username}-${message}-${Date.now()}`,
+        username,
+        message,
+        isStreamer,
+        color: tags.color || null
       });
-    }
+
+      if (this.botIndex === 0 && Math.random() < 0.2) {
+        this.aiService.emit('chatMessage', JSON.stringify({
+          chatMessage: message, username, messageCount: this.messageCount
+        }));
+      }
+    });
 
     this.client.on('connected', (address, port) => {
       this.isConnected = true;
-      this.reconnectAttempts = 0;
       logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} connected at ${address}:${port}`);
     });
 
@@ -89,16 +94,16 @@ export class Bot {
       logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} logged in`)
     );
 
-    // Each bot listens to its own manual channel: manualMessage_0, manualMessage_1, ...
+    // Each bot listens to its own manual event
     this.aiService.on(`manualMessage_${this.botIndex}`, (message: string) => {
       if (message?.trim()) {
-        logger.info(`Bot[${this.botIndex}] queuing manual: "${message}"`);
+        logger.info(`Bot[${this.botIndex}] queuing: "${message}"`);
         this.manualQueue.push(message);
         this.processManualQueue();
       }
     });
 
-    // AI messages only go through bot 0
+    // AI messages only via bot 0
     if (this.botIndex === 0) {
       this.aiService.on('message', (message: string) => {
         if (message?.trim()) {
@@ -136,11 +141,8 @@ export class Bot {
 
   private async setupVoiceCapture(channel: string): Promise<void> {
     logger.info(`Setting up voice capture for channel: ${channel}`);
-    try {
-      await this.aiService.startVoiceCapture(channel);
-    } catch (error) {
-      logger.error('Error setting up voice capture:', error);
-    }
+    try { await this.aiService.startVoiceCapture(channel); }
+    catch (error) { logger.error('Error setting up voice capture:', error); }
   }
 
   private async sendMessage(message: string): Promise<void> {
