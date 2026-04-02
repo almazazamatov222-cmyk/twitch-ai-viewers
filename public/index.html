@@ -20,11 +20,11 @@ body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif
 .badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; letter-spacing:1px; background:var(--bg3); color:var(--muted); }
 .badge.live { background:var(--red); color:white; }
 .ch { font-weight:600; }
-.game { color:var(--muted); font-size:13px; }
+.game { color:var(--muted); font-size:13px; margin-left:10px; }
+.topbar-r { margin-left:auto; display:flex; align-items:center; gap:10px; }
 .vw { color:var(--muted); font-size:13px; }
-.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
-.follow-all-btn { font-size:12px; padding:5px 14px; background:transparent; border:1px solid var(--purple); border-radius:20px; color:var(--purple); cursor:pointer; font-weight:600; transition:all .15s; }
-.follow-all-btn:hover { background:var(--purple); color:white; }
+.storage-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:var(--bg3); color:var(--muted); }
+.storage-badge.ok { background:#0a2e1a; color:var(--green); }
 
 .left { background:var(--bg2); border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
 .sec-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; padding:12px 14px 6px; }
@@ -35,10 +35,6 @@ body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif
 .binfo { flex:1; min-width:0; }
 .bname { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bst { font-size:11px; color:var(--muted); } .bst.on { color:var(--green); }
-.bot-acts { display:flex; align-items:center; gap:6px; }
-.follow-btn { font-size:11px; padding:3px 8px; background:transparent; border:1px solid var(--border); border-radius:12px; color:var(--muted); cursor:pointer; }
-.follow-btn:hover { border-color:var(--purple); color:var(--purple); }
-.follow-btn.done { border-color:var(--green); color:var(--green); }
 .tog { position:relative; width:34px; height:18px; cursor:pointer; flex-shrink:0; }
 .tog input { opacity:0; width:0; height:0; }
 .sl { position:absolute; inset:0; background:var(--border); border-radius:18px; transition:.2s; }
@@ -58,30 +54,38 @@ input:checked+.sl::before { transform:translateX(16px); }
 .tags { display:flex; flex-wrap:wrap; gap:5px; padding:0 14px 10px; }
 .tag { font-size:12px; padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:20px; cursor:pointer; color:var(--text); transition:all .15s; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; user-select:none; }
 .tag:hover { background:var(--purple); border-color:var(--purple); color:white; }
-.tag-x { font-size:9px; opacity:0; pointer-events:none; line-height:1; }
+.tag-x { font-size:9px; opacity:0; pointer-events:none; }
 .tag:hover .tag-x { opacity:.8; pointer-events:auto; }
 .add-tag { font-size:12px; padding:4px 10px; background:transparent; border:1px dashed var(--border); border-radius:20px; cursor:pointer; color:var(--muted); }
 .add-tag:hover { border-color:var(--purple); color:var(--purple); }
 
 .center { display:flex; flex-direction:column; overflow:hidden; }
 .chat-hdr { padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg2); font-size:12px; font-weight:600; color:var(--muted); display:flex; align-items:center; }
-.msgs { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:3px; }
+.msgs { flex:1; overflow-y:auto; padding:8px 14px; display:flex; flex-direction:column; gap:2px; }
 .msgs::-webkit-scrollbar { width:4px; }
 .msgs::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
-.msg { display:flex; gap:8px; padding:4px 6px; border-radius:6px; }
-.msg:hover { background:var(--bg3); }
-.mav { width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; margin-top:1px; }
-.mav.bot{background:var(--purple);} .mav.user{background:#1e5f8a;} .mav.streamer{background:#92400e;} .mav.system{background:var(--bg4);color:var(--muted);}
-.mbody { flex:1; }
-.mmeta { display:flex; align-items:baseline; gap:6px; margin-bottom:1px; }
-.mname { font-size:12px; font-weight:700; }
-.mname.bot{color:var(--purple);} .mname.user{color:#5ba3d9;} .mname.streamer{color:#f59e0b;} .mname.system{color:var(--muted);}
-.mtime { font-size:10px; color:var(--muted); }
-.mtext { font-size:13px; line-height:1.4; word-break:break-word; }
-.mact { margin-top:3px; display:none; gap:4px; }
-.msg:hover .mact { display:flex; }
-.mbtn { font-size:11px; padding:2px 8px; background:var(--bg3); border:1px solid var(--border); border-radius:4px; cursor:pointer; color:var(--muted); }
-.mbtn:hover { color:var(--text); border-color:var(--purple); }
+
+/* Chat messages — exactly like Twitch */
+.msg { display:flex; gap:8px; padding:3px 6px; border-radius:4px; }
+.msg:hover { background:rgba(255,255,255,.04); }
+.mav { width:22px; height:22px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; margin-top:2px; }
+.mav.bot { background:var(--purple); }
+.mav.user { background:#1e5f8a; }
+.mav.streamer { background:#92400e; }
+.mav.system { background:var(--bg4); color:var(--muted); }
+.mbody { flex:1; font-size:13px; line-height:1.5; }
+.mname { font-weight:700; margin-right:4px; cursor:pointer; }
+.mname:hover { text-decoration:underline; }
+.mname.bot { color:var(--purple); }
+.mname.user { color:#5ba3d9; }
+.mname.streamer { color:#f59e0b; }
+.mname.system { color:var(--muted); }
+.mtime { font-size:10px; color:var(--muted); margin-right:6px; }
+.mtext { color:var(--text); word-break:break-word; }
+/* Reply button on hover */
+.reply-btn { display:none; font-size:11px; padding:1px 7px; margin-left:6px; background:var(--bg3); border:1px solid var(--border); border-radius:4px; cursor:pointer; color:var(--muted); vertical-align:middle; }
+.msg:hover .reply-btn { display:inline-block; }
+.reply-btn:hover { color:var(--text); border-color:var(--purple); }
 
 .send-wrap { border-top:1px solid var(--border); padding:10px 14px; background:var(--bg2); }
 .rbar { display:flex; align-items:center; gap:8px; padding:5px 10px; background:var(--bg3); border-left:2px solid var(--purple); border-radius:0 4px 4px 0; margin-bottom:8px; font-size:12px; color:var(--muted); }
@@ -110,22 +114,22 @@ select.bsel { background:var(--bg3); border:1px solid var(--border); border-radi
 .mb { padding:7px 16px; border-radius:var(--r); border:none; cursor:pointer; font-size:13px; font-weight:600; }
 .mb.c { background:var(--bg3); color:var(--muted); border:1px solid var(--border); }
 .mb.ok { background:var(--purple); color:white; }
-.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 20px; font-size:13px; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 20px; font-size:13px; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none; white-space:nowrap; }
 .toast.show { opacity:1; }
-@keyframes fi { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
-.msg { animation:fi .15s ease; }
+@keyframes fi { from{opacity:0;transform:translateY(2px)} to{opacity:1;transform:translateY(0)} }
+.msg { animation:fi .1s ease; }
 </style>
 </head>
 <body>
 <div class="layout">
 <div class="topbar">
-  <span class="logo">⬡ BOT DASHBOARD</span>
+  <span class="logo">⬡ DASHBOARD</span>
   <span class="badge" id="lbadge">ОФЛАЙН</span>
   <span class="ch" id="chname">загрузка...</span>
-  <span class="game" id="gname" style="margin-left:12px"></span>
-  <div class="topbar-right">
+  <span class="game" id="gname"></span>
+  <div class="topbar-r">
     <span class="vw" id="vw"></span>
-    <button class="follow-all-btn" id="follow-all-btn">♥ Подписать всех</button>
+    <span class="storage-badge" id="storage-badge">хранилище</span>
   </div>
 </div>
 
@@ -187,11 +191,12 @@ const post = (url, body) => fetch(url, {
 
 let replyTo=null, botList=[], mcnt=0, selectedBot=0, phraseData={}, modalMode='', modalCtx={};
 
-function showToast(msg, ms=2500) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), ms);
+function toast(msg, ms=2500) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
 }
+
+function now() { return new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}); }
 
 async function loadStatus() {
   try {
@@ -201,26 +206,26 @@ async function loadStatus() {
     renderBots(botList);
     renderPhrases(phraseData);
     updateHeader(d.channelInfo, d.channel);
+    if (d.storageInfo) {
+      const sb = document.getElementById('storage-badge');
+      sb.textContent = d.storageInfo.includes('✓') ? '💾 Volume' : '⚡ Temp';
+      if (d.storageInfo.includes('✓')) sb.classList.add('ok');
+    }
     const sel = document.getElementById('bsel');
     const prev = sel.value;
     sel.innerHTML = botList.map((b,i)=>`<option value="${i}">${esc(b.username)}</option>`).join('');
-    if (prev && sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+    if (prev && sel.querySelector(`[value="${prev}"]`)) sel.value = prev;
     selectedBot = parseInt(sel.value)||0;
   } catch(e) { console.error(e); }
 }
 
 function updateHeader(info, channel) {
-  const name = (channel||'').includes('twitch.tv/')
-    ? channel.split('twitch.tv/')[1].split('/')[0] : (channel||'');
+  const name = (channel||'').includes('twitch.tv/') ? channel.split('twitch.tv/')[1].split('/')[0] : (channel||'');
   document.getElementById('chname').textContent = name;
   if (!info) return;
-  const g = info.gameName && info.gameName!=='Not specified' ? '🎮 '+info.gameName : '';
-  document.getElementById('gname').textContent = g;
+  document.getElementById('gname').textContent = info.gameName && info.gameName!=='Not specified' ? '🎮 '+info.gameName : '';
   document.getElementById('vw').textContent = info.viewerCount ? '👁 '+info.viewerCount : '';
-  if (info.isLive) {
-    const b = document.getElementById('lbadge');
-    b.textContent='LIVE'; b.classList.add('live');
-  }
+  if (info.isLive) { const b=document.getElementById('lbadge'); b.textContent='LIVE'; b.classList.add('live'); }
 }
 
 function renderBots(bots) {
@@ -231,62 +236,22 @@ function renderBots(bots) {
         <div class="bname">${esc(b.username)}</div>
         <div class="bst ${b.connected&&b.enabled?'on':''}">${b.connected&&b.enabled?'онлайн':'выключен'}</div>
       </div>
-      <div class="bot-acts">
-        <button class="follow-btn" data-follow="${i}" title="Подписаться на канал">♥</button>
-        <label class="tog">
-          <input type="checkbox" ${b.enabled?'checked':''} data-bot="${i}" class="bot-toggle">
-          <span class="sl"></span>
-        </label>
-      </div>
+      <label class="tog">
+        <input type="checkbox" ${b.enabled?'checked':''} data-bot="${i}" class="bot-toggle">
+        <span class="sl"></span>
+      </label>
     </div>`).join('');
 }
 
 document.getElementById('bot-list').addEventListener('change', async e => {
   if (e.target.classList.contains('bot-toggle')) {
-    await post('/api/toggle-bot', { botIndex: parseInt(e.target.dataset.bot) });
+    await post('/api/toggle-bot', {botIndex: parseInt(e.target.dataset.bot)});
     setTimeout(loadStatus, 500);
   }
 });
 
-document.getElementById('bot-list').addEventListener('click', async e => {
-  const btn = e.target.closest('[data-follow]');
-  if (!btn) return;
-  const idx = parseInt(btn.dataset.follow);
-  const botName = botList[idx]?.username || `Bot${idx+1}`;
-  btn.textContent = '...'; btn.disabled = true;
-  try {
-    const r = await post('/api/follow', { botIndex: idx });
-    if (r.ok) {
-      btn.textContent = '✓'; btn.classList.add('done');
-      showToast(`${botName} подписан!`);
-    } else {
-      btn.textContent = '♥'; btn.disabled = false;
-      showToast(`Ошибка: ${r.error}`, 4000);
-    }
-  } catch(e) {
-    btn.textContent = '♥'; btn.disabled = false;
-    showToast('Ошибка подписки');
-  }
-});
-
-document.getElementById('follow-all-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('follow-all-btn');
-  btn.textContent = '...'; btn.disabled = true;
-  let ok=0, fail=0;
-  for (let i=0; i<botList.length; i++) {
-    try {
-      const r = await post('/api/follow', { botIndex: i });
-      r.ok ? ok++ : fail++;
-    } catch(_) { fail++; }
-  }
-  btn.textContent = '♥ Подписать всех';
-  btn.disabled = false;
-  showToast(`Подписано: ${ok}, ошибок: ${fail}`);
-  setTimeout(loadStatus, 500);
-});
-
 function renderPhrases(groups) {
-  document.getElementById('phrase-list').innerHTML = Object.entries(groups).map(([g, phrases])=>`
+  document.getElementById('phrase-list').innerHTML = Object.entries(groups).map(([g,phrases])=>`
     <div class="pg">
       <div class="pg-head">
         <button class="pg-name-btn" data-action="random" data-group="${esc(g)}">${esc(g)} ▸</button>
@@ -310,132 +275,112 @@ document.getElementById('phrase-list').addEventListener('click', async e => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   e.stopPropagation();
-  const action = el.dataset.action;
-  const group = el.dataset.group;
-  const phrases = phraseData[group] || [];
-  const pi = parseInt(el.dataset.pi);
-
+  const action=el.dataset.action, group=el.dataset.group;
+  const phrases=phraseData[group]||[], pi=parseInt(el.dataset.pi);
   if (action==='random') {
-    if (!phrases.length) return;
-    await post('/api/phrase/random', { group, botIndex: selectedBot });
+    if (phrases.length) await post('/api/phrase/random',{group,botIndex:selectedBot});
   } else if (action==='exact') {
-    if (!isNaN(pi) && phrases[pi]!==undefined)
-      await post('/api/phrase/exact', { phrase: phrases[pi], botIndex: selectedBot });
+    if (!isNaN(pi) && phrases[pi]!==undefined) await post('/api/phrase/exact',{phrase:phrases[pi],botIndex:selectedBot});
   } else if (action==='del-phrase') {
-    if (!isNaN(pi) && phrases[pi]!==undefined)
-      await post('/api/phrases/delete', { group, phrase: phrases[pi] });
-  } else if (action==='add-phrase') {
-    openModal('add-phrase', { group });
-  } else if (action==='rename-group') {
-    openModal('rename-group', { group });
+    if (!isNaN(pi) && phrases[pi]!==undefined) await post('/api/phrases/delete',{group,phrase:phrases[pi]});
+  } else if (action==='add-phrase') { openModal('add-phrase',{group});
+  } else if (action==='rename-group') { openModal('rename-group',{group});
   } else if (action==='del-group') {
-    if (confirm(`Удалить группу "${group}"?`))
-      await post('/api/phrases/delete-group', { group });
+    if (confirm(`Удалить группу "${group}"?`)) await post('/api/phrases/delete-group',{group});
   }
 });
+document.getElementById('new-group-btn').addEventListener('click',()=>openModal('new-group',{}));
 
-document.getElementById('new-group-btn').addEventListener('click', () => openModal('new-group', {}));
-
-// Send
-document.getElementById('bsel').addEventListener('change', function() {
-  selectedBot = parseInt(this.value)||0;
-});
+document.getElementById('bsel').addEventListener('change',function(){selectedBot=parseInt(this.value)||0;});
 
 async function sendMsg() {
-  const inp = document.getElementById('minp');
-  let text = inp.value.trim();
-  if (!text) return;
-  if (replyTo) text = '@'+replyTo+' '+text;
-  inp.value = ''; clearReply();
-  // Don't add to chat here - socket event will do it
-  await post('/api/send', { message: text, botIndex: selectedBot });
+  const inp=document.getElementById('minp');
+  let text=inp.value.trim(); if(!text) return;
+  if (replyTo) text='@'+replyTo+' '+text;
+  inp.value=''; clearReply();
+  await post('/api/send',{message:text,botIndex:selectedBot});
 }
-
-document.getElementById('sendbtn').addEventListener('click', sendMsg);
-document.getElementById('minp').addEventListener('keydown', e => { if (e.key==='Enter') sendMsg(); });
+document.getElementById('sendbtn').addEventListener('click',sendMsg);
+document.getElementById('minp').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
 
 function setReply(name) {
   replyTo=name;
   document.getElementById('rbar').classList.remove('hidden');
-  document.getElementById('rlabel').textContent='Ответ для @'+name;
+  document.getElementById('rlabel').textContent='↩ Ответ для @'+name;
   document.getElementById('minp').focus();
 }
 function clearReply() { replyTo=null; document.getElementById('rbar').classList.add('hidden'); }
-document.getElementById('rx').addEventListener('click', clearReply);
+document.getElementById('rx').addEventListener('click',clearReply);
 
 function addMsg(type, name, text, canReply) {
-  const chat = document.getElementById('chat');
-  const t = new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
-  const rb = canReply ? `<button class="mbtn reply-btn" data-name="${esc(name)}">↩ ответить</button>` : '';
+  const chat=document.getElementById('chat');
+  const replyBtn = canReply ? `<button class="reply-btn" data-name="${esc(name)}">↩</button>` : '';
+  // Twitch-style: [time] Name: text
   chat.insertAdjacentHTML('beforeend',`
     <div class="msg">
       <div class="mav ${type}">${esc(name.slice(0,2).toUpperCase())}</div>
       <div class="mbody">
-        <div class="mmeta"><span class="mname ${type}">${esc(name)}</span><span class="mtime">${t}</span></div>
-        <div class="mtext">${esc(text)}</div>
-        <div class="mact">${rb}</div>
+        <span class="mtime">${now()}</span><span class="mname ${type}" data-name="${esc(name)}">${esc(name)}</span>: <span class="mtext">${esc(text)}</span>${replyBtn}
       </div>
     </div>`);
-  chat.scrollTop = chat.scrollHeight;
-  document.getElementById('mcnt').textContent = (++mcnt)+' сообщений';
+  chat.scrollTop=chat.scrollHeight;
+  document.getElementById('mcnt').textContent=(++mcnt)+' сообщений';
 }
 
-document.getElementById('chat').addEventListener('click', e => {
-  const btn = e.target.closest('.reply-btn');
-  if (btn) setReply(btn.dataset.name);
+document.getElementById('chat').addEventListener('click',e=>{
+  const btn=e.target.closest('.reply-btn, .mname');
+  if (!btn) return;
+  const name=btn.dataset.name;
+  if (name) setReply(name);
 });
 
 function addTranscript(text) {
   document.getElementById('notr').style.display='none';
-  const area = document.getElementById('trarea');
-  const t = new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const area=document.getElementById('trarea');
+  const t=new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   area.insertAdjacentHTML('afterbegin',`<div class="tr-item">${esc(text)}<div class="tr-t">${t}</div></div>`);
-  const items = area.querySelectorAll('.tr-item');
-  if (items.length>20) items[items.length-1].remove();
+  const items=area.querySelectorAll('.tr-item');
+  if(items.length>20) items[items.length-1].remove();
 }
 
-function openModal(mode, ctx) {
+function openModal(mode,ctx){
   modalMode=mode; modalCtx=ctx;
-  const titles = {'add-phrase':`Новая фраза → ${ctx.group}`,'new-group':'Новая группа','rename-group':`Переименовать: ${ctx.group}`};
-  document.getElementById('mtitle').textContent = titles[mode]||'';
-  const i1=document.getElementById('mi1'), i2=document.getElementById('mi2');
+  const t={'add-phrase':`Новая фраза → ${ctx.group}`,'new-group':'Новая группа','rename-group':`Переименовать: ${ctx.group}`};
+  document.getElementById('mtitle').textContent=t[mode]||'';
+  const i1=document.getElementById('mi1'),i2=document.getElementById('mi2');
   i2.style.display='none';
-  if (mode==='add-phrase') { i1.placeholder='Текст фразы'; i1.value=''; document.getElementById('mok').textContent='Добавить'; }
-  else if (mode==='new-group') { i1.placeholder='Название группы'; i1.value=''; i2.placeholder='Первая фраза'; i2.value=''; i2.style.display=''; document.getElementById('mok').textContent='Создать'; }
-  else if (mode==='rename-group') { i1.placeholder='Новое название'; i1.value=ctx.group; document.getElementById('mok').textContent='Сохранить'; }
+  if(mode==='add-phrase'){i1.placeholder='Текст фразы';i1.value='';document.getElementById('mok').textContent='Добавить';}
+  else if(mode==='new-group'){i1.placeholder='Название группы';i1.value='';i2.placeholder='Первая фраза';i2.value='';i2.style.display='';document.getElementById('mok').textContent='Создать';}
+  else if(mode==='rename-group'){i1.placeholder='Новое название';i1.value=ctx.group;document.getElementById('mok').textContent='Сохранить';}
   document.getElementById('modal').classList.remove('hidden');
   setTimeout(()=>i1.focus(),50);
 }
-
-async function modalOk() {
-  const v1=document.getElementById('mi1').value.trim();
-  const v2=document.getElementById('mi2').value.trim();
-  if (!v1) return;
-  if (modalMode==='add-phrase') await post('/api/phrases/add',{group:modalCtx.group,phrase:v1});
-  else if (modalMode==='new-group') await post('/api/phrases/add',{group:v1,phrase:v2||'...'});
-  else if (modalMode==='rename-group') await post('/api/phrases/rename-group',{oldName:modalCtx.group,newName:v1});
+async function modalOk(){
+  const v1=document.getElementById('mi1').value.trim(),v2=document.getElementById('mi2').value.trim();
+  if(!v1) return;
+  if(modalMode==='add-phrase') await post('/api/phrases/add',{group:modalCtx.group,phrase:v1});
+  else if(modalMode==='new-group') await post('/api/phrases/add',{group:v1,phrase:v2||'...'});
+  else if(modalMode==='rename-group') await post('/api/phrases/rename-group',{oldName:modalCtx.group,newName:v1});
   document.getElementById('modal').classList.add('hidden');
 }
-
 document.getElementById('mcancel').addEventListener('click',()=>document.getElementById('modal').classList.add('hidden'));
 document.getElementById('mok').addEventListener('click',modalOk);
 document.addEventListener('keydown',e=>{
-  if (e.key==='Escape') document.getElementById('modal').classList.add('hidden');
-  if (e.key==='Enter' && !document.getElementById('modal').classList.contains('hidden')) modalOk();
+  if(e.key==='Escape') document.getElementById('modal').classList.add('hidden');
+  if(e.key==='Enter'&&!document.getElementById('modal').classList.contains('hidden')) modalOk();
 });
 
-// Socket — use botName from server, not botIndex lookup
-socket.on('bot-sent', d => {
-  const name = d.botName || botList[d.botIndex]?.username || 'Бот';
-  addMsg('bot', name, d.message, false);
+socket.on('bot-sent',d=>{
+  const name=d.botName||botList[d.botIndex]?.username||'Бот';
+  addMsg('bot',name,d.message,false);
 });
-socket.on('incoming-chat', d => addMsg(d.isStreamer?'streamer':'user', d.username, d.message, true));
-socket.on('transcription', d => addTranscript(d.text));
-socket.on('phrases-updated', groups => { phraseData=groups; renderPhrases(groups); });
-socket.on('bot-state', () => loadStatus());
+socket.on('incoming-chat',d=>addMsg(d.isStreamer?'streamer':'user',d.username,d.message,true));
+socket.on('transcription',d=>addTranscript(d.text));
+socket.on('phrases-updated',g=>{phraseData=g;renderPhrases(g);});
+socket.on('bot-state',()=>loadStatus());
 
 loadStatus();
-setInterval(loadStatus, 30000);
+setInterval(loadStatus,30000);
 setTimeout(()=>addMsg('system','СИСТЕМА','Дашборд подключён',false),300);
 </script>
 </body>
