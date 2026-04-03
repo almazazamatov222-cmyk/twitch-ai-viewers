@@ -36,6 +36,7 @@ body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif
 .follow-bot-btn { font-size:11px; padding:2px 7px; background:transparent; border:1px solid var(--border); border-radius:10px; color:var(--muted); cursor:pointer; margin-right:4px; }
 .follow-bot-btn:hover { border-color:#e91e8c; color:#e91e8c; }
 .follow-bot-btn.done { border-color:#e91e8c; color:#e91e8c; }
+.follow-bot-btn.authed { border-color:#e91e8c; color:#e91e8c; }
 
 .left { background:var(--bg2); border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
 .sec-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; padding:12px 14px 6px; }
@@ -249,8 +250,8 @@ function renderBots(bots) {
         <div class="bname">${esc(b.username)}</div>
         <div class="bst ${b.connected&&b.enabled?'on':''}">${b.connected&&b.enabled?'онлайн':'выключен'}</div>
       </div>
-      <button class="follow-bot-btn" data-follow="${i}" title="Подписаться">♥</button>
-      <button class="watch-btn ${b.watching?'active':''}" data-watch="${i}" title="${b.watching?'Смотрит':'Не смотрит'}">${b.watching?'👁':'○'}</button>
+      <button class="follow-bot-btn ${b.hasUserToken?'authed':''}" data-follow="${i}" title="${b.hasUserToken?'Подписаться':'Нужна авторизация — нажми'}">${b.hasUserToken?'♥':'🔑'}</button>
+      <button class="watch-btn ${b.watching?'active':''}" data-watch="${i}" title="${b.watching?'Смотрит':'Начать смотреть'}">${b.watching?'👁':'○'}</button>
       <label class="tog">
         <input type="checkbox" ${b.enabled?'checked':''} data-bot="${i}" class="bot-toggle">
         <span class="sl"></span>
@@ -390,10 +391,22 @@ document.getElementById('bot-list').addEventListener('click', async e => {
   const fb = e.target.closest('[data-follow]');
   if (fb) {
     const idx = parseInt(fb.dataset.follow);
+    const botList_ = botList;
+    const hasToken = botList_[idx]?.hasUserToken;
+    if (!hasToken) {
+      // Open auth page in new tab
+      window.open('/auth?bot='+idx, '_blank', 'width=600,height=700');
+      toast('Авторизуй бота в открывшейся вкладке, потом нажми ♥ снова', 5000);
+      // Reload after 10s to check if token was saved
+      setTimeout(loadStatus, 10000);
+      return;
+    }
     fb.textContent='...'; fb.disabled=true;
     const r = await post('/api/follow',{botIndex:idx});
     if (r.ok) { fb.textContent='♥'; fb.classList.add('done'); toast(`${r.botName} подписан!`); }
+    else if (r.authUrl) { window.open(r.authUrl,'_blank','width=600,height=700'); toast('Нужна авторизация', 4000); fb.textContent='🔑'; fb.disabled=false; }
     else { fb.textContent='♥'; fb.disabled=false; toast('Ошибка: '+r.error, 4000); }
+    setTimeout(loadStatus, 1000);
     return;
   }
   const wb = e.target.closest('[data-watch]');
