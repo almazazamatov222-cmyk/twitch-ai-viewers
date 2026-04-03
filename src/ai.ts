@@ -158,11 +158,8 @@ export class AIService extends EventEmitter {
       ? channel.split('/').pop()! : channel;
     if (!channelName) throw new Error('Invalid channel name');
     logger.info('Starting voice capture for channel:', channelName);
-    try {
-      this.currentChannelInfo = await this.getChannelInfo(channelName);
-    } catch (e) {
-      logger.warn('Could not fetch channel info, proceeding anyway');
-    }
+    try { this.currentChannelInfo = await this.getChannelInfo(channelName); }
+    catch (e) { logger.warn('Could not fetch channel info'); }
     this.isCapturing = true;
     this.captureLoop(channelName).catch(error => {
       logger.error('Error in capture loop:', error);
@@ -536,35 +533,51 @@ export class AIService extends EventEmitter {
   }
 
   private async getStreamUrl(channelName: string): Promise<string> {
-    // Anonymous GQL - no auth needed for public streams
-    const resp = await axios.post('https://gql.twitch.tv/gql', {
-      operationName: 'PlaybackAccessToken_Template',
-      query: `query PlaybackAccessToken_Template($login:String!,$isLive:Boolean!,$vodID:ID!,$isVod:Boolean!,$playerType:String!){streamPlaybackAccessToken(channelName:$login,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isLive){value signature __typename}videoPlaybackAccessToken(id:$vodID,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isVod){value signature __typename}}`,
-      variables: { isLive: true, login: channelName, isVod: false, vodID: '', playerType: 'site' }
-    }, {
-      headers: {
-        'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Origin': 'https://www.twitch.tv',
-        'Referer': 'https://www.twitch.tv/',
-      },
-      timeout: 15000
-    });
+    // Wait until stream is live (check every 30s)
+    let attempts = 0;
+    while (attempts < 10) {
+      try {
+        const resp = await axios.post('https://gql.twitch.tv/gql', {
+          operationName: 'PlaybackAccessToken_Template',
+          query: `query PlaybackAccessToken_Template($login:String!,$isLive:Boolean!,$vodID:ID!,$isVod:Boolean!,$playerType:String!){streamPlaybackAccessToken(channelName:$login,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isLive){value signature __typename}videoPlaybackAccessToken(id:$vodID,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isVod){value signature __typename}}`,
+          variables: { isLive: true, login: channelName, isVod: false, vodID: '', playerType: 'site' }
+        }, {
+          headers: {
+            'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Origin': 'https://www.twitch.tv',
+            'Referer': 'https://www.twitch.tv/',
+          },
+          timeout: 15000
+        });
 
-    const td = resp.data?.data?.streamPlaybackAccessToken;
-    if (!td?.value || !td?.signature) {
-      logger.error('GQL response:', JSON.stringify(resp.data));
-      throw new Error('No stream token from Twitch GQL');
+        const td = resp.data?.data?.streamPlaybackAccessToken;
+        if (!td?.value || !td?.signature) {
+          logger.warn(`GQL: no token for ${channelName} (attempt ${attempts+1}), stream may be offline. Waiting 30s...`);
+          this.isCapturing = false;
+          await new Promise(r => setTimeout(r, 30000));
+          // Refresh channel info
+          try { this.currentChannelInfo = await this.getChannelInfo(channelName); } catch (_) {}
+          this.isCapturing = true;
+          attempts++;
+          continue;
+        }
+
+        const url = `https://usher.ttvnw.net/api/channel/hls/${channelName}.m3u8`
+          + `?client_id=kimne78kx3ncx6brgo4mv6wki5h1ko`
+          + `&token=${encodeURIComponent(td.value)}`
+          + `&sig=${td.signature}`
+          + `&allow_source=true&allow_spectre=true&fast_bread=true&p=${Math.floor(Math.random()*9999999)}`;
+
+        logger.info(`Got HLS URL for ${channelName}`);
+        return url;
+      } catch (err: any) {
+        logger.error('GQL error:', err?.response?.data || err?.message);
+        await new Promise(r => setTimeout(r, 15000));
+        attempts++;
+      }
     }
-
-    const url = `https://usher.ttvnw.net/api/channel/hls/${channelName}.m3u8`
-      + `?client_id=kimne78kx3ncx6brgo4mv6wki5h1ko`
-      + `&token=${encodeURIComponent(td.value)}`
-      + `&sig=${td.signature}`
-      + `&allow_source=true&allow_spectre=true&fast_bread=true&p=${Math.floor(Math.random()*9999999)}`;
-
-    logger.info('Got HLS URL via anonymous GQL for', channelName);
-    return url;
+    throw new Error(`Could not get stream URL for ${channelName} after 10 attempts`);
   }
 } 
