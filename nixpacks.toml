@@ -1,11 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_18", "python3"]
+nixPkgs = ["nodejs_18", "python3", "ffmpeg"]
 
 [phases.install]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = [
-  "python3 -m pip install streamlink --break-system-packages 2>/dev/null || python3 -m pip install streamlink 2>/dev/null || true",
-  "npm run build"
-]
+cmds = ["npm run build"]
