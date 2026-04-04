@@ -22,7 +22,6 @@ export class Bot {
 
   private manualQueue: string[] = [];
   private isSendingManual = false;
-
   private aiQueue: string[] = [];
   private isSendingAI = false;
 
@@ -50,15 +49,16 @@ export class Bot {
   private setupEventHandlers() {
     if (!this.client) return;
 
-    // CRITICAL: only bot[0] listens to chat - prevents 4x duplicates
+    // Only bot[0] reads chat (no duplicates)
     if (this.botIndex === 0) {
       this.client.on('message', (_ch, tags, message, self) => {
         if (self) return;
         const username = tags['display-name'] || tags.username || 'viewer';
-        const ch = this.channelName.toLowerCase().replace(/^https?:\/\/www\.twitch\.tv\//, '').replace(/\/$/, '');
-        const isStreamer = (tags.username || '').toLowerCase() === ch;
+        const chLower = this.channelName.toLowerCase()
+          .replace(/^https?:\/\/www\.twitch\.tv\//, '').replace(/\/$/, '');
+        const isStreamer = (tags.username || '').toLowerCase() === chLower;
         this.aiService.emit('incomingChat', { id: tags.id, username, message, isStreamer, color: tags.color });
-        if (Math.random() < 0.2)
+        if (Math.random() < 0.15)
           this.aiService.emit('chatMessage', JSON.stringify({ chatMessage: message, username }));
       });
     }
@@ -71,19 +71,19 @@ export class Bot {
       this.isConnected = false;
       logger.warn(`Bot[${this.botIndex}] ${this.client?.getUsername()} disconnected: ${r}`);
     });
-    this.client.on('logon', () => logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} logged in`));
+    this.client.on('logon', () =>
+      logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} logged in`)
+    );
 
-    // Each bot has its own event channel for manual messages
+    // Dashboard manual messages
     this.aiService.on(`manualMessage_${this.botIndex}`, (msg: string) => {
       if (msg?.trim()) { this.manualQueue.push(msg); this.processManualQueue(); }
     });
+  }
 
-    // AI messages only via bot[0]
-    if (this.botIndex === 0) {
-      this.aiService.on('message', (msg: string) => {
-        if (msg?.trim()) { this.aiQueue.push(msg); this.processAIQueue(); }
-      });
-    }
+  // Called by main.ts round-robin - all bots get AI messages
+  public sendAIMessage(message: string) {
+    if (message?.trim()) { this.aiQueue.push(message); this.processAIQueue(); }
   }
 
   private async processManualQueue() {
@@ -91,7 +91,8 @@ export class Bot {
     this.isSendingManual = true;
     while (this.manualQueue.length) {
       const msg = this.manualQueue.shift()!;
-      try { await this.sendMessage(msg); this.messageCount++; } catch (e) { logger.error(`Bot[${this.botIndex}] send error:`, e); }
+      try { await this.sendMessage(msg); this.messageCount++; }
+      catch (e) { logger.error(`Bot[${this.botIndex}] manual error:`, e); }
       if (this.manualQueue.length) await new Promise(r => setTimeout(r, 350));
     }
     this.isSendingManual = false;
@@ -103,7 +104,8 @@ export class Bot {
     const delay = parseInt(process.env.MESSAGE_INTERVAL || '5000');
     while (this.aiQueue.length) {
       const msg = this.aiQueue.shift()!;
-      try { await this.sendMessage(msg); this.messageCount++; } catch (e) { logger.error(`Bot[${this.botIndex}] AI error:`, e); }
+      try { await this.sendMessage(msg); this.messageCount++; }
+      catch (e) { logger.error(`Bot[${this.botIndex}] AI error:`, e); }
       if (this.aiQueue.length) await new Promise(r => setTimeout(r, delay));
     }
     this.isSendingAI = false;
@@ -117,16 +119,25 @@ export class Bot {
   private async sendMessage(message: string) {
     if (!this.client || !message) return;
     const raw = process.env.TWITCH_CHANNEL!;
-    const ch = raw.includes('twitch.tv/') ? raw.split('twitch.tv/')[1].split('/')[0].split('?')[0] : raw;
+    const ch = raw.includes('twitch.tv/')
+      ? raw.split('twitch.tv/')[1].split('/')[0].split('?')[0] : raw;
     await this.client.say(`#${ch}`, message);
   }
 
-  public connect() { this.client?.connect().catch(e => logger.error(`Bot[${this.botIndex}] connect error:`, e)); }
+  public connect() {
+    this.client?.connect().catch(e => {
+      const msg = String(e);
+      if (!msg.includes('Socket is not opened') && !msg.includes('Cannot disconnect'))
+        logger.error(`Bot[${this.botIndex}] connect error:`, e);
+    });
+  }
+
   public disconnect() {
     this.manualQueue = []; this.aiQueue = [];
     try { this.client?.disconnect(); } catch (_) {}
     try { if (this.botIndex === 0) this.aiService.stopVoiceCapture(); } catch (_) {}
   }
+
   public isBotConnected() { return this.isConnected; }
   public getUsername() { return this.client?.getUsername() || ''; }
   public getBotIndex() { return this.botIndex; }
