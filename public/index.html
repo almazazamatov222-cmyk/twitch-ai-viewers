@@ -412,12 +412,7 @@ socket.on('bot-sent', d => {
   const name = d.botName || botList[d.botIndex]?.username || 'Бот';
   addMsg('bot', name, d.message, false);
 });
-socket.on('ai-message-pending', d => {
-  // Show AI message as coming from next bot in round-robin
-  const connectedBots = botList.filter(b => b.connected && b.enabled);
-  const name = connectedBots.length > 0 ? connectedBots[0].username : 'Бот';
-  addMsg('bot', name, d.message, false);
-});
+
 socket.on('incoming-chat', d => addMsg(d.isStreamer?'streamer':'user', d.username, d.message, true));
 socket.on('transcription', d => addTranscript(d.text));
 socket.on('phrases-updated', g => { phraseData=g; renderPhrases(g); });
