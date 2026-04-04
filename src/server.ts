@@ -51,10 +51,8 @@ async function getChannelId(channelName: string): Promise<string> {
   return id;
 }
 
-async function followChannel(userToken: string, broadcasterId: string): Promise<void> {
-  // Twitch removed Helix follow endpoint in 2023 - use GQL only
-  // Token must be in OAuth format (not Bearer)
-  const token = userToken.replace('oauth:', '').replace('OAuth ', '');
+async function gqlFollow(token: string, broadcasterId: string): Promise<void> {
+  const cleanToken = token.replace(/^oauth:/i, '').replace(/^OAuth /i, '').trim();
   const resp = await axios.post('https://gql.twitch.tv/gql', [{
     operationName: 'FollowButton_FollowUser',
     variables: { input: { targetID: broadcasterId, disableNotifications: false } },
@@ -62,19 +60,39 @@ async function followChannel(userToken: string, broadcasterId: string): Promise<
   }], {
     headers: {
       'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      'Authorization': `OAuth ${token}`,
+      'Authorization': `OAuth ${cleanToken}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       'Origin': 'https://www.twitch.tv',
       'Referer': 'https://www.twitch.tv/',
     }
   });
   const errors = resp.data?.[0]?.errors;
-  if (errors?.length) {
-    logger.error('GQL follow errors:', JSON.stringify(errors));
-    throw new Error(errors[0].message);
+  if (errors?.length) throw new Error(errors[0].message);
+}
+
+async function followChannel(userToken: string, botIndex: number): Promise<void> {
+  // Try 1: user token from /auth OAuth flow
+  try {
+    const broadcasterId = await getChannelId(getChannelName());
+    await gqlFollow(userToken, broadcasterId);
+    logger.info(`Follow via user token: success`);
+    return;
+  } catch (e: any) {
+    logger.warn('User token follow failed:', e?.message, '- trying IRC token...');
   }
-  logger.info('GQL follow success, data:', JSON.stringify(resp.data?.[0]?.data));
+
+  // Try 2: IRC OAuth token (from twitchapps.com which uses Twitch web client)
+  // These tokens are compatible with GQL since they use Twitch's own OAuth client
+  const ircToken = process.env[`BOT${botIndex + 1}_OAUTH_TOKEN`] 
+    || process.env[`BOT${botIndex + 1}_OAUTH`] || '';
+  if (ircToken) {
+    const broadcasterId = await getChannelId(getChannelName());
+    await gqlFollow(ircToken, broadcasterId);
+    logger.info(`Follow via IRC token: success`);
+    return;
+  }
+  throw new Error('All follow methods failed - no valid token found');
 }
 
 export function startDashboardServer(aiService: AIService, bots: any[]) {
@@ -186,8 +204,7 @@ if(token){
       });
     }
     try {
-      const broadcasterId = await getChannelId(getChannelName());
-      await followChannel(token, broadcasterId);
+      await followChannel(token, idx);
       logger.info(`Bot ${botName} followed ${getChannelName()}`);
       res.json({ ok: true, botName });
     } catch (e: any) {
@@ -198,17 +215,14 @@ if(token){
 
   app.post('/api/follow-all', async (_req, res) => {
     const results: any[] = [];
-    let broadcasterId = '';
-    try { broadcasterId = await getChannelId(getChannelName()); }
-    catch (e) { return res.status(500).json({ error: 'Could not get channel ID' }); }
     for (let i = 0; i < bots.length; i++) {
-      const token = getUserToken(i);
       const botName = bots[i]?.getUsername?.() || `Bot${i + 1}`;
-      if (!token) { results.push({ botName, ok: false, error: `Нет BOT${i + 1}_USER_TOKEN` }); continue; }
+      const token = getUserToken(i) || 
+        (process.env[`BOT${i+1}_OAUTH_TOKEN`] || process.env[`BOT${i+1}_OAUTH`] || '');
       try {
-        await followChannel(token, broadcasterId);
+        await followChannel(token, i);
         results.push({ botName, ok: true });
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 800));
       } catch (e: any) {
         results.push({ botName, ok: false, error: e?.message });
       }
