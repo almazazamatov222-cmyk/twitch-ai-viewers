@@ -25,7 +25,6 @@ export class Bot {
   private aiQueue: string[] = [];
   private isSendingAI = false;
 
-  // Callback to notify server when AI message is actually sent
   public onAISent?: (message: string, botIndex: number, botName: string) => void;
 
   constructor(config: BotConfig) {
@@ -52,7 +51,7 @@ export class Bot {
   private setupEventHandlers() {
     if (!this.client) return;
 
-    // Only bot[0] reads incoming chat (no duplicates)
+    // Only bot[0] reads chat (no duplicates)
     if (this.botIndex === 0) {
       this.client.on('message', (_ch, tags, message, self) => {
         if (self) return;
@@ -60,9 +59,11 @@ export class Bot {
         const chLower = this.channelName.toLowerCase()
           .replace(/^https?:\/\/www\.twitch\.tv\//, '').replace(/\/$/, '');
         const isStreamer = (tags.username || '').toLowerCase() === chLower;
-        this.aiService.emit('incomingChat', { id: tags.id, username, message, isStreamer, color: tags.color });
-        if (Math.random() < 0.15)
-          this.aiService.emit('chatMessage', JSON.stringify({ chatMessage: message, username }));
+        this.aiService.emit('incomingChat', {
+          id: tags.id, username, message, isStreamer, color: tags.color
+        });
+        // Emit to all bots for chat awareness
+        this.aiService.emit('chatMessage', JSON.stringify({ chatMessage: message, username }));
       });
     }
 
@@ -78,13 +79,11 @@ export class Bot {
       logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} logged in`)
     );
 
-    // Dashboard manual messages (per-bot)
     this.aiService.on(`manualMessage_${this.botIndex}`, (msg: string) => {
       if (msg?.trim()) { this.manualQueue.push(msg); this.processManualQueue(); }
     });
   }
 
-  // Called by main.ts round-robin dispatcher for AI messages
   public sendAIMessage(message: string) {
     if (message?.trim()) { this.aiQueue.push(message); this.processAIQueue(); }
   }
@@ -94,8 +93,7 @@ export class Bot {
     this.isSendingManual = true;
     while (this.manualQueue.length) {
       const msg = this.manualQueue.shift()!;
-      const sent = await this.sendMessage(msg);
-      if (sent) this.messageCount++;
+      await this.sendMessage(msg);
       if (this.manualQueue.length) await new Promise(r => setTimeout(r, 350));
     }
     this.isSendingManual = false;
@@ -104,16 +102,14 @@ export class Bot {
   private async processAIQueue() {
     if (this.isSendingAI || !this.aiQueue.length) return;
     this.isSendingAI = true;
-    const delay = Math.max(parseInt(process.env.MESSAGE_INTERVAL || '5000'), 2000);
     while (this.aiQueue.length) {
       const msg = this.aiQueue.shift()!;
       const sent = await this.sendMessage(msg);
       if (sent) {
         this.messageCount++;
-        // Notify dashboard that AI message was actually sent
         this.onAISent?.(msg, this.botIndex, this.getUsername());
       }
-      if (this.aiQueue.length) await new Promise(r => setTimeout(r, delay));
+      if (this.aiQueue.length) await new Promise(r => setTimeout(r, 1500));
     }
     this.isSendingAI = false;
   }
@@ -123,11 +119,10 @@ export class Bot {
     catch (e) { logger.error('Voice capture setup error:', e); }
   }
 
-  // Returns true if message was actually sent
   private async sendMessage(message: string): Promise<boolean> {
     if (!this.client || !message) return false;
     if (!this.isConnected) {
-      logger.warn(`Bot[${this.botIndex}] not connected, skipping message: "${message}"`);
+      logger.warn(`Bot[${this.botIndex}] not connected, skip: "${message}"`);
       return false;
     }
     try {
@@ -135,10 +130,10 @@ export class Bot {
       const ch = raw.includes('twitch.tv/')
         ? raw.split('twitch.tv/')[1].split('/')[0].split('?')[0] : raw;
       await this.client.say(`#${ch}`, message);
-      logger.info(`Bot[${this.botIndex}] SENT to #${ch}: "${message}"`);
+      logger.info(`Bot[${this.botIndex}] SENT: "${message}"`);
       return true;
     } catch (e: any) {
-      logger.error(`Bot[${this.botIndex}] send FAILED: "${message}" | Error: ${e?.message || e}`);
+      logger.error(`Bot[${this.botIndex}] FAILED: "${message}" | ${e?.message}`);
       return false;
     }
   }

@@ -11,6 +11,7 @@ import { logger } from './logger';
 
 const DATA_DIR = fs.existsSync('/data') ? '/data' : '/tmp';
 const PHRASES_FILE = path.join(DATA_DIR, 'phrases.json');
+const TOKENS_FILE = path.join(DATA_DIR, 'follow_tokens.json');
 
 const DEFAULT_PHRASES: Record<string, string[]> = {
   'Приветствия': ['Привет стрим!', 'О, живой!', 'Хей!', 'Здарова!'],
@@ -27,18 +28,23 @@ function savePhrases(g: Record<string, string[]>) {
   try { fs.writeFileSync(PHRASES_FILE, JSON.stringify(g, null, 2)); } catch (_) {}
 }
 
+// Follow tokens: stored per bot index, obtained via Twitch web OAuth
+const followTokens: Record<number, string> = (() => {
+  try { if (fs.existsSync(TOKENS_FILE)) return JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf-8')); }
+  catch (_) {}
+  return {};
+})();
+
+function saveFollowTokens() {
+  try { fs.writeFileSync(TOKENS_FILE, JSON.stringify(followTokens)); } catch (_) {}
+}
+
 function getChannelName(): string {
   const ch = process.env.TWITCH_CHANNEL || '';
   return ch.includes('twitch.tv/') ? ch.split('twitch.tv/')[1].split('/')[0].split('?')[0] : ch;
 }
 
-// Get bot's IRC OAuth token (always available)
-function getIRCToken(botIndex: number): string {
-  return (process.env[`BOT${botIndex + 1}_OAUTH_TOKEN`] || process.env[`BOT${botIndex + 1}_OAUTH`] || '')
-    .replace(/^oauth:/i, '');
-}
-
-// GQL anonymous headers
+// Anonymous GQL headers for viewer sim
 const GQL = {
   'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
   'Content-Type': 'application/json',
@@ -57,9 +63,9 @@ async function getChannelId(channelName: string): Promise<string> {
   return id;
 }
 
-// Follow using IRC token (twitchapps.com tokens are valid Twitch OAuth tokens)
-async function followWithToken(token: string, clientId: string, broadcasterId: string): Promise<void> {
+async function gqlFollow(token: string, broadcasterId: string): Promise<void> {
   const cleanToken = token.replace(/^oauth:/i, '').trim();
+  // Use Twitch web client ID - this is what Twitch uses internally
   const resp = await axios.post('https://gql.twitch.tv/gql', [{
     operationName: 'FollowButton_FollowUser',
     variables: { input: { targetID: broadcasterId, disableNotifications: false } },
@@ -70,22 +76,11 @@ async function followWithToken(token: string, clientId: string, broadcasterId: s
       }
     }
   }], {
-    headers: {
-      'Client-ID': clientId,
-      'Authorization': `OAuth ${cleanToken}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Origin': 'https://www.twitch.tv',
-      'Referer': 'https://www.twitch.tv/',
-    }
+    headers: { ...GQL, 'Authorization': `OAuth ${cleanToken}` }
   });
   const errors = resp.data?.[0]?.errors;
   if (errors?.length) throw new Error(errors[0].message);
-  logger.info('Follow OK:', JSON.stringify(resp.data?.[0]?.data));
 }
-
-// Runtime token storage (from /auth OAuth flow, persists until restart)
-const runtimeTokens: Record<number, string> = {};
 
 export function startDashboardServer(aiService: AIService, bots: any[]) {
   const app = express();
@@ -101,9 +96,8 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
   const phraseGroups = loadPhrases();
   const viewers: Record<number, ViewerSimulator> = {};
 
-  logger.info(`Storage: ${DATA_DIR} | Phrases: ${PHRASES_FILE}`);
+  logger.info(`Storage: ${DATA_DIR}`);
 
-  // ── Status ─────────────────────────────────────
   app.get('/api/status', (_req, res) => {
     res.json({
       channel: process.env.TWITCH_CHANNEL,
@@ -112,8 +106,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
         connected: bot.isBotConnected?.() || false,
         enabled: botStates[i] ?? true,
         watching: !!viewers[i]?.running,
-        hasIRCToken: !!getIRCToken(i),
-        hasUserToken: !!runtimeTokens[i],
+        hasFollowToken: !!followTokens[i],
         index: i,
       })),
       channelInfo: aiService.currentChannelInfo,
@@ -121,18 +114,117 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     });
   });
 
-  // ── Follow (removed - Twitch API closed in 2023) ──
-  app.post('/api/follow', (_req, res) => {
-    res.status(410).json({ 
-      error: 'Follow через API невозможен — Twitch закрыл этот эндпоинт в 2023 году. Подпишись вручную через браузер.',
-      gone: true
-    });
-  });
-  app.post('/api/follow-all', (_req, res) => {
-    res.status(410).json({ error: 'Follow API removed by Twitch in 2023', gone: true });
+  // ── Follow OAuth using Twitch web client (kimne78kx3ncx6brgo4mv6wki5h1ko) ──
+  // This client ID IS whitelisted for GQL mutations
+  app.get('/auth/follow', (req, res) => {
+    const botIdx = parseInt(String(req.query.bot || '0'));
+    const host = req.headers.host || 'localhost';
+    const proto = host.includes('localhost') ? 'http' : 'https';
+    const redirectUri = `${proto}://${host}/auth/follow/callback`;
+    // Use Twitch web client ID - tokens issued by it work with GQL
+    const clientId = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+    const scope = 'user:edit:follows';
+    const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&state=${botIdx}&force_verify=true`;
+    res.redirect(url);
   });
 
-    // ── Watch ───────────────────────────────────────
+  app.get('/auth/follow/callback', (_req, res) => {
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Follow Auth</title>
+<style>body{background:#0e0e10;color:#efeff1;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;margin:0;text-align:center}.ok{color:#00c853;font-size:22px}.err{color:#e53935}p{opacity:.6;font-size:14px}</style></head><body>
+<div id="msg">Авторизация...</div>
+<script>
+const p=new URLSearchParams(window.location.hash.substring(1));
+const t=p.get('access_token'),s=p.get('state')||'0';
+const m=document.getElementById('msg');
+if(t){
+  fetch('/auth/follow/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t,botIndex:parseInt(s)})})
+  .then(r=>r.json()).then(d=>{
+    m.innerHTML=d.ok
+      ?'<div class="ok">✓ Авторизован: '+d.botName+'</div><p>Закрой это окно и нажми ♥</p>'
+      :'<div class="err">Ошибка: '+d.error+'</div>';
+  });
+}else{m.innerHTML='<div class="err">'+(p.get('error_description')||'Нет токена')+'</div>';}
+</script></body></html>`);
+  });
+
+  app.post('/auth/follow/save', async (req, res) => {
+    const { token, botIndex = 0 } = req.body;
+    if (!token) return res.status(400).json({ error: 'No token' });
+    try {
+      // Verify token
+      const meResp = await axios.get('https://id.twitch.tv/oauth2/validate', {
+        headers: { 'Authorization': `OAuth ${token}` }
+      });
+      const username = meResp.data.login;
+      if (!username) throw new Error('Invalid token');
+      const idx = parseInt(String(botIndex));
+      followTokens[idx] = token;
+      saveFollowTokens();
+      logger.info(`Follow token saved for bot[${idx}] = ${username}`);
+      io.emit('bot-state', {});
+      res.json({ ok: true, botName: username });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.response?.data?.message || e?.message || 'Failed' });
+    }
+  });
+
+  app.post('/api/follow', async (req, res) => {
+    const idx = parseInt(String(req.body.botIndex || 0));
+    const botName = bots[idx]?.getUsername?.() || `Bot${idx + 1}`;
+
+    if (!followTokens[idx]) {
+      const host = req.headers.host;
+      const proto = (host || '').includes('localhost') ? 'http' : 'https';
+      return res.status(401).json({
+        error: 'Нужна авторизация',
+        authUrl: `${proto}://${host}/auth/follow?bot=${idx}`
+      });
+    }
+
+    try {
+      const broadcasterId = await getChannelId(getChannelName());
+      await gqlFollow(followTokens[idx], broadcasterId);
+      logger.info(`${botName} followed ${getChannelName()}`);
+      res.json({ ok: true, botName });
+    } catch (e: any) {
+      // Token might be expired
+      if (e?.response?.status === 401) {
+        delete followTokens[idx];
+        saveFollowTokens();
+        const host = req.headers.host;
+        const proto = (host || '').includes('localhost') ? 'http' : 'https';
+        return res.status(401).json({
+          error: 'Токен истёк, нужно авторизоваться снова',
+          authUrl: `${proto}://${host}/auth/follow?bot=${idx}`
+        });
+      }
+      logger.error(`Follow error for ${botName}:`, e?.response?.data || e?.message);
+      res.status(500).json({ error: e?.message || 'Follow failed' });
+    }
+  });
+
+  app.post('/api/follow-all', async (req, res) => {
+    const results: any[] = [];
+    let broadcasterId = '';
+    try { broadcasterId = await getChannelId(getChannelName()); }
+    catch (e) { return res.status(500).json({ error: 'Channel not found' }); }
+
+    for (let i = 0; i < bots.length; i++) {
+      const botName = bots[i]?.getUsername?.() || `Bot${i + 1}`;
+      if (!followTokens[i]) { results.push({ botName, ok: false, error: 'No token - нажми ♥ для авторизации' }); continue; }
+      try {
+        await gqlFollow(followTokens[i], broadcasterId);
+        results.push({ botName, ok: true });
+        await new Promise(r => setTimeout(r, 700));
+      } catch (e: any) {
+        if (e?.response?.status === 401) { delete followTokens[i]; saveFollowTokens(); }
+        results.push({ botName, ok: false, error: e?.message });
+      }
+    }
+    res.json({ results });
+  });
+
+  // ── Watch ────────────────────────────────────────
   app.post('/api/watch', async (req, res) => {
     const idx = parseInt(String(req.body.botIndex || 0));
     const botName = bots[idx]?.getUsername?.() || `Bot${idx + 1}`;
@@ -173,7 +265,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ results });
   });
 
-  // ── Messages ────────────────────────────────────
+  // ── Messages ─────────────────────────────────────
   function emitSend(message: string, idx: number) {
     aiService.emit(`manualMessage_${idx}`, message);
     io.emit('bot-sent', {
@@ -204,30 +296,26 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ ok: true });
   });
 
-  // ── Phrase CRUD ─────────────────────────────────
+  // ── Phrase CRUD ───────────────────────────────────
   app.post('/api/phrases/add', (req, res) => {
-    const { group, phrase } = req.body;
-    if (!group || !phrase) return res.status(400).json({ error: 'Missing' });
+    const { group, phrase } = req.body; if (!group || !phrase) return res.status(400).json({ error: 'Missing' });
     if (!phraseGroups[group]) phraseGroups[group] = [];
     phraseGroups[group].push(phrase); savePhrases(phraseGroups);
     io.emit('phrases-updated', phraseGroups); res.json({ ok: true });
   });
   app.post('/api/phrases/delete', (req, res) => {
-    const { group, phrase } = req.body;
-    if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
+    const { group, phrase } = req.body; if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
     phraseGroups[group] = phraseGroups[group].filter(p => p !== phrase);
     if (!phraseGroups[group].length) delete phraseGroups[group];
     savePhrases(phraseGroups); io.emit('phrases-updated', phraseGroups); res.json({ ok: true });
   });
   app.post('/api/phrases/rename-group', (req, res) => {
-    const { oldName, newName } = req.body;
-    if (!phraseGroups[oldName] || !newName) return res.status(400).json({ error: 'Invalid' });
+    const { oldName, newName } = req.body; if (!phraseGroups[oldName] || !newName) return res.status(400).json({ error: 'Invalid' });
     phraseGroups[newName] = phraseGroups[oldName]; delete phraseGroups[oldName];
     savePhrases(phraseGroups); io.emit('phrases-updated', phraseGroups); res.json({ ok: true });
   });
   app.post('/api/phrases/delete-group', (req, res) => {
-    const { group } = req.body;
-    if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
+    const { group } = req.body; if (!phraseGroups[group]) return res.status(404).json({ error: 'Not found' });
     delete phraseGroups[group]; savePhrases(phraseGroups);
     io.emit('phrases-updated', phraseGroups); res.json({ ok: true });
   });
@@ -240,9 +328,7 @@ export function startDashboardServer(aiService: AIService, bots: any[]) {
     res.json({ ok: true, enabled: botStates[botIndex] });
   });
 
-  // ── Events ──────────────────────────────────────
-  aiService.on('incomingChat', (d: any) => io.emit('incoming-chat', d));
-  // AI messages handled by round-robin in main.ts - dashboard gets bot-sent when actually sent
+  // Events
   aiService.on('transcription', (text: string) => io.emit('transcription', { text, time: Date.now() }));
 
   const PORT = parseInt(process.env.PORT || '3000');
