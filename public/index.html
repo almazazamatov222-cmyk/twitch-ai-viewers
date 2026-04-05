@@ -130,7 +130,7 @@ select.bsel{background:var(--bg3);border:1px solid var(--border);border-radius:v
   <div class="topbar-r">
     <span class="vw" id="vw"></span>
     <button class="tbtn watch" id="watch-all-btn">👁 Смотреть всем</button>
-    <button class="tbtn" id="follow-all-btn">♥ Фолло всем</button>
+    <button class="tbtn" onclick="window.open('https://twitch.tv','_blank')" title="Фоллоу только вручную через браузер">♥ Фолло (вручную)</button>
   </div>
 </div>
 
@@ -216,6 +216,7 @@ async function loadStatus() {
 
 function updateHeader(info, channel) {
   if (!channel) return;
+  currentChannelName = channel.includes('twitch.tv/') ? channel.split('twitch.tv/')[1].split('/')[0] : channel;
   const name = channel.includes('twitch.tv/') ? channel.split('twitch.tv/')[1].split('/')[0] : channel;
   document.getElementById('chname').textContent = name;
   if (!info) return;
@@ -225,6 +226,8 @@ function updateHeader(info, channel) {
   if (info.isLive) { const b=document.getElementById('lbadge'); b.textContent='LIVE'; b.classList.add('live'); }
 }
 
+let currentChannelName = '';
+function getChannelName() { return currentChannelName; }
 function renderBots(bots) {
   document.getElementById('bot-list').innerHTML = bots.map((b,i) => {
     const offline = !b.connected && b.enabled;
@@ -238,7 +241,7 @@ function renderBots(bots) {
         <div class="bst ${statusClass}" title="${offline?'Обнови OAuth токен на twitchapps.com/tmi':''}">${statusText}</div>
       </div>
       <div class="bacts">
-        <button class="bbtn follow" data-follow="${i}" title="Подписаться">♥</button>
+        <button class="bbtn follow-ext" onclick="window.open('https://twitch.tv/${getChannelName()}','_blank')" title="Подписаться вручную на сайте Twitch">♥</button>
         <button class="bbtn watch ${b.watching?'on':''}" data-watch="${i}" title="${b.watching?'Смотрит поток':'Начать смотреть'}">${b.watching?'👁':'○'}</button>
         <label class="tog">
           <input type="checkbox" ${b.enabled?'checked':''} data-bot="${i}" class="bot-toggle">
@@ -257,31 +260,11 @@ document.getElementById('bot-list').addEventListener('change', async e => {
 });
 
 document.getElementById('bot-list').addEventListener('click', async e => {
+  // Follow opens Twitch in browser (API removed by Twitch in 2023)
   const fb = e.target.closest('[data-follow]');
   if (fb) {
-    const idx=parseInt(fb.dataset.follow);
-    const orig=fb.textContent; fb.textContent='...'; fb.disabled=true;
-    const r = await post('/api/follow',{botIndex:idx});
-    fb.disabled=false;
-    if (r.ok) {
-      fb.textContent='✓'; fb.classList.add('done'); toast(r.botName+' подписан! ♥');
-    } else if (r.authUrl) {
-      fb.textContent='🔑';
-      const popup = window.open(r.authUrl, 'twitch-auth', 'width=520,height=620,scrollbars=yes');
-      toast('Войди под аккаунтом бота → потом снова нажми ♥', 6000);
-      const poll = setInterval(async () => {
-        const st = await fetch('/api/status').then(x=>x.json());
-        if (st.bots?.[idx]?.hasUserToken) {
-          clearInterval(poll); try{popup?.close();}catch(_){}
-          fb.textContent='♥'; toast('Авторизован! Теперь нажми ♥');
-          loadStatus();
-        }
-      }, 2000);
-      setTimeout(()=>clearInterval(poll), 120000);
-    } else {
-      fb.textContent=orig; toast('Ошибка: '+(r.error||'неизвестно'), 5000);
-    }
-    setTimeout(loadStatus,1000);
+    window.open('https://twitch.tv/'+getChannelName(), '_blank');
+    toast('Подпишись вручную на сайте Twitch ♥', 3000);
     return;
   }
   const wb = e.target.closest('[data-watch]');
@@ -299,17 +282,7 @@ document.getElementById('bot-list').addEventListener('click', async e => {
   }
 });
 
-document.getElementById('follow-all-btn').addEventListener('click', async () => {
-  const btn=document.getElementById('follow-all-btn');
-  btn.textContent='...'; btn.disabled=true;
-  const r = await post('/api/follow-all',{});
-  btn.textContent='♥ Фолло всем'; btn.disabled=false;
-  const ok=(r.results||[]).filter(x=>x.ok).length;
-  const fail=(r.results||[]).filter(x=>!x.ok);
-  let msg = `Подписано: ${ok}`;
-  if (fail.length) msg += ` | Ошибки: ${fail.map(f=>f.botName+': '+f.error).join(', ')}`;
-  toast(msg, 5000);
-});
+// follow-all removed - Twitch API closed 2023
 
 document.getElementById('watch-all-btn').addEventListener('click', async () => {
   const btn=document.getElementById('watch-all-btn');
