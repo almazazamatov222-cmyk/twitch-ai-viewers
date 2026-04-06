@@ -46,6 +46,7 @@ const GQL_HEADERS = {
 
 async function gqlFollow(token: string, broadcasterId: string): Promise<void> {
   const cleanToken = token.replace(/^oauth:/i, '').trim();
+  logger.info(`GQL follow: broadcasterId=${broadcasterId}, token=${cleanToken.slice(0,8)}...`);
   const resp = await axios.post('https://gql.twitch.tv/gql', [{
     operationName: 'FollowButton_FollowUser',
     variables: { input: { targetID: broadcasterId, disableNotifications: false } },
@@ -53,6 +54,7 @@ async function gqlFollow(token: string, broadcasterId: string): Promise<void> {
   }], {
     headers: { ...GQL_HEADERS, 'Authorization': `OAuth ${cleanToken}` }
   });
+  logger.info(`GQL follow response:`, JSON.stringify(resp.data?.[0]));
   const errors = resp.data?.[0]?.errors;
   if (errors?.length) throw new Error(errors[0].message);
 }
@@ -139,23 +141,27 @@ if(t){
   });
 
   app.post('/auth/save', async (req, res) => {
-    const { token, botIndex = 0, type = 'follow' } = req.body;
+    const { token, botIndex = 0 } = req.body;
     if (!token) return res.status(400).json({ error: 'No token' });
     try {
-      // Validate via Twitch
       const validate = await axios.get('https://id.twitch.tv/oauth2/validate', {
         headers: { 'Authorization': `OAuth ${token}` }
       });
       const username = validate.data.login;
-      if (!username) throw new Error('Invalid token');
+      if (!username) throw new Error('Invalid token from Twitch validate');
       const idx = parseInt(String(botIndex));
       followTokens[idx] = token;
       saveFollowTokens();
-      logger.info(`Follow token saved for bot[${idx}] = ${username}`);
+      // Verify it was saved
+      const saved = followTokens[idx];
+      logger.info(`Token SAVED bot[${idx}]=${username}, token length=${saved?.length}, file=${TOKENS_FILE}`);
+      logger.info(`All tokens now: ${JSON.stringify(Object.fromEntries(Object.entries(followTokens).map(([k,v])=>[k,v?.slice(0,8)+'...'])))}`);
       io.emit('bot-state', {});
       res.json({ ok: true, botName: username });
     } catch (e: any) {
-      res.status(500).json({ error: e?.response?.data?.message || e?.message || 'Failed' });
+      const msg = e?.response?.data?.message || e?.message || 'Failed';
+      logger.error('auth/save error:', msg);
+      res.status(500).json({ error: msg });
     }
   });
 
@@ -177,19 +183,21 @@ if(t){
     }
 
     try {
+      logger.info(`Following ${getChannelName()} as bot[${idx}] token=${followTokens[idx]?.slice(0,8)}...`);
       const broadcasterId = await getChannelId(getChannelName());
+      logger.info(`BroadcasterId: ${broadcasterId}`);
       await gqlFollow(followTokens[idx], broadcasterId);
-      logger.info(`${botName} followed ${getChannelName()}`);
+      logger.info(`SUCCESS: ${botName} followed ${getChannelName()}`);
       res.json({ ok: true, botName });
     } catch (e: any) {
+      logger.error(`Follow FAILED for ${botName}:`, JSON.stringify(e?.response?.data) || e?.message);
       if (e?.response?.status === 401) {
         delete followTokens[idx]; saveFollowTokens();
         const host = req.headers.host;
         const proto = (host || '').includes('localhost') ? 'http' : 'https';
         return res.status(401).json({ error: 'Токен истёк', authUrl: `${proto}://${host}/auth/follow?bot=${idx}` });
       }
-      logger.error(`Follow error:`, e?.response?.data || e?.message);
-      res.status(500).json({ error: e?.message || 'Follow failed' });
+      res.status(500).json({ error: e?.response?.data?.[0]?.errors?.[0]?.message || e?.message || 'Follow failed' });
     }
   });
 

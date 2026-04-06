@@ -480,36 +480,52 @@ ${botMemory}` : ''}
   }
 
   private async getStreamUrl(channelName: string): Promise<string> {
+    // Use BOT1 IRC token for authenticated GQL - this puts user_id in the token
+    // which allows Twitch HLS access. Anonymous tokens return user_id:null → 404
+    const ircToken = (process.env.BOT1_OAUTH_TOKEN || process.env.BOT1_OAUTH || '')
+      .replace(/^oauth:/i, '').trim();
+
+    const headers: Record<string, string> = {
+      'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Origin': 'https://www.twitch.tv',
+      'Referer': 'https://www.twitch.tv/',
+    };
+    if (ircToken) {
+      headers['Authorization'] = `OAuth ${ircToken}`;
+      logger.info('Using authenticated GQL for stream URL');
+    } else {
+      logger.warn('No IRC token - using anonymous GQL (may fail)');
+    }
+
     for (let attempt = 0; attempt < 999; attempt++) {
       try {
         const resp = await axios.post('https://gql.twitch.tv/gql', {
           operationName: 'PlaybackAccessToken_Template',
           query: `query PlaybackAccessToken_Template($login:String!,$isLive:Boolean!,$vodID:ID!,$isVod:Boolean!,$playerType:String!){streamPlaybackAccessToken(channelName:$login,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isLive){value signature __typename}videoPlaybackAccessToken(id:$vodID,params:{platform:"web",playerBackend:"mediaplayer",playerType:$playerType})@include(if:$isVod){value signature __typename}}`,
           variables: { isLive: true, login: channelName, isVod: false, vodID: '', playerType: 'site' }
-        }, {
-          headers: {
-            'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Origin': 'https://www.twitch.tv',
-            'Referer': 'https://www.twitch.tv/',
-          },
-          timeout: 15000
-        });
+        }, { headers, timeout: 15000 });
 
         const td = resp.data?.data?.streamPlaybackAccessToken;
         if (!td?.value || !td?.signature) {
-          if (attempt === 0) logger.warn(`${channelName} may be offline. Waiting 30s...`);
+          if (attempt === 0) logger.warn(`${channelName} offline or no token. Waiting 30s...`);
           await new Promise(r => setTimeout(r, 30000));
           try { this.currentChannelInfo = await this.getChannelInfo(channelName); } catch (_) {}
           continue;
         }
 
+        // Verify user_id is in token (not null)
+        try {
+          const tokenData = JSON.parse(decodeURIComponent(td.value));
+          logger.info(`GQL token user_id: ${tokenData.user_id}, channel: ${tokenData.channel}`);
+        } catch (_) {}
+
         const url = `https://usher.ttvnw.net/api/channel/hls/${channelName}.m3u8`
           + `?client_id=kimne78kx3ncx6brgo4mv6wki5h1ko`
           + `&token=${encodeURIComponent(td.value)}`
           + `&sig=${td.signature}`
-          + `&allow_source=true&allow_spectre=true&fast_bread=true&p=${Math.floor(Math.random()*9999999)}`;
+          + `&allow_source=true&allow_spectre=true&fast_bread=true&p=${Math.floor(Math.random() * 9999999)}`;
 
         logger.info(`Stream URL ready for ${channelName}`);
         return url;
