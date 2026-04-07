@@ -1,155 +1,231 @@
-import tmi from 'tmi.js';
+import * as tmi from 'tmi.js';
 import { AIService } from './ai';
-import { logger } from './logger';
 
 interface BotConfig {
   username: string;
-  oauth: string;
-  channel: string;
-  aiService: AIService;
-  shouldHandleVoiceCapture?: boolean;
-  botIndex: number;
+  token: string;
 }
 
-export class Bot {
-  private client: tmi.Client | null = null;
-  private aiService: AIService;
-  private isConnected: boolean = false;
-  private botIndex: number;
-  private channelName: string;
-  private messageCount: number = 0;
-  private shouldHandleVoiceCapture: boolean;
+interface BotInstance {
+  client: tmi.Client;
+  username: string;
+  connected: boolean;
+  reconnectAttempts: number;
+  messagesSent: number;
+  messageTimer?: NodeJS.Timeout;
+}
 
-  private manualQueue: string[] = [];
-  private isSendingManual = false;
-  private aiQueue: string[] = [];
-  private isSendingAI = false;
+export class BotManager {
+  private bots: Map<string, BotInstance> = new Map();
+  private ai: AIService;
+  private channel: string;
+  private messageInterval: number;
+  private streamContext: string;
+  private language: string;
+  private emit: (event: string, data: any) => void;
+  private globalInterval?: NodeJS.Timeout;
+  private stopped = false;
 
-  public onAISent?: (message: string, botIndex: number, botName: string) => void;
+  constructor(
+    configs: BotConfig[],
+    channel: string,
+    groqKey: string,
+    settings: {
+      messageInterval: number;
+      language: string;
+      streamContext: string;
+      aiSettings: any;
+    },
+    emitFn: (event: string, data: any) => void
+  ) {
+    this.channel = channel.toLowerCase().replace('#', '');
+    this.messageInterval = settings.messageInterval * 1000;
+    this.streamContext = settings.streamContext;
+    this.language = settings.language;
+    this.emit = emitFn;
+    this.ai = new AIService(groqKey, settings.aiSettings);
 
-  constructor(config: BotConfig) {
-    this.aiService = config.aiService;
-    this.shouldHandleVoiceCapture = config.shouldHandleVoiceCapture || false;
-    this.botIndex = config.botIndex;
-    this.channelName = config.channel;
-
-    if (!config.oauth.startsWith('oauth:'))
-      throw new Error(`Invalid OAuth for ${config.username}`);
-
-    this.client = new tmi.Client({
-      options: { debug: false, messagesLogLevel: 'info' },
-      identity: { username: config.username, password: config.oauth },
-      channels: [config.channel],
-      connection: { reconnect: true, maxReconnectAttempts: 5, secure: true }
-    });
-
-    this.setupEventHandlers();
-    if (this.shouldHandleVoiceCapture)
-      this.setupVoiceCapture(config.channel).catch(e => logger.error('Voice capture error:', e));
+    configs.forEach(cfg => this.createBot(cfg));
   }
 
-  private setupEventHandlers() {
-    if (!this.client) return;
+  private createBot(cfg: BotConfig): void {
+    const token = cfg.token.startsWith('oauth:') ? cfg.token : `oauth:${cfg.token}`;
 
-    if (this.botIndex === 0) {
-      this.client.on('message', (_ch, tags, message, self) => {
-        if (self) return;
-        const username = tags['display-name'] || tags.username || 'viewer';
-        const chLower = this.channelName.toLowerCase()
-          .replace(/^https?:\/\/www\.twitch\.tv\//, '').replace(/\/$/, '');
-        const isStreamer = (tags.username || '').toLowerCase() === chLower;
-        this.aiService.emit('incomingChat', {
-          id: tags.id, username, message, isStreamer, color: tags.color
-        });
+    const client = new tmi.Client({
+      options: { debug: false, skipMembership: true },
+      identity: {
+        username: cfg.username,
+        password: token,
+      },
+      channels: [`#${this.channel}`],
+      connection: {
+        reconnect: true,
+        maxReconnectAttempts: 10,
+        reconnectDecay: 1.5,
+        reconnectInterval: 2000,
+        secure: true,
+      },
+    });
+
+    const instance: BotInstance = {
+      client,
+      username: cfg.username,
+      connected: false,
+      reconnectAttempts: 0,
+      messagesSent: 0,
+    };
+
+    this.bots.set(cfg.username, instance);
+
+    // Events
+    client.on('connected', () => {
+      instance.connected = true;
+      instance.reconnectAttempts = 0;
+      this.emit('bot:status', {
+        username: cfg.username,
+        state: 'connected',
+        message: `Подключён к #${this.channel}`,
       });
-    }
+    });
 
-    this.client.on('connected', (addr, port) => {
-      this.isConnected = true;
-      logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} connected at ${addr}:${port}`);
+    client.on('disconnected', (reason) => {
+      instance.connected = false;
+      if (!this.stopped) {
+        this.emit('bot:status', {
+          username: cfg.username,
+          state: 'reconnecting',
+          message: `Переподключение... (${reason})`,
+        });
+      }
     });
-    this.client.on('disconnected', r => {
-      this.isConnected = false;
-      logger.warn(`Bot[${this.botIndex}] ${this.client?.getUsername()} disconnected: ${r}`);
+
+    client.on('reconnect', () => {
+      instance.reconnectAttempts++;
+      this.emit('bot:status', {
+        username: cfg.username,
+        state: 'connecting',
+        message: `Попытка ${instance.reconnectAttempts}...`,
+      });
     });
-    this.client.on('logon', () =>
-      logger.info(`Bot[${this.botIndex}] ${this.client?.getUsername()} logged in`)
+
+    // Read chat for AI context
+    client.on('message', (_channel, tags, message, self) => {
+      if (!self && tags.username !== cfg.username) {
+        this.ai.addChatContext(`${tags.username}: ${message}`);
+      }
+    });
+
+    this.emit('bot:status', { username: cfg.username, state: 'connecting', message: 'Подключение...' });
+  }
+
+  async start(): Promise<void> {
+    this.stopped = false;
+
+    // Connect all bots (staggered to avoid rate limits)
+    const connectPromises = Array.from(this.bots.values()).map((bot, idx) =>
+      new Promise<void>(resolve => {
+        setTimeout(async () => {
+          try {
+            await bot.client.connect();
+          } catch (err: any) {
+            this.emit('bot:status', {
+              username: bot.username,
+              state: 'error',
+              message: err.message || 'Ошибка подключения',
+            });
+          }
+          resolve();
+        }, idx * 1500); // 1.5s between each bot
+      })
     );
 
-    this.aiService.on(`manualMessage_${this.botIndex}`, (msg: string) => {
-      if (msg?.trim()) { this.manualQueue.push(msg); this.processManualQueue(); }
+    await Promise.allSettled(connectPromises);
+
+    // Start message scheduler - stagger bots so they don't all post at once
+    this.startMessageScheduler();
+  }
+
+  private startMessageScheduler(): void {
+    const bots = Array.from(this.bots.values());
+    if (bots.length === 0) return;
+
+    // Each bot sends on a staggered schedule
+    bots.forEach((bot, idx) => {
+      const offset = Math.floor((this.messageInterval / bots.length) * idx);
+      
+      bot.messageTimer = setTimeout(async () => {
+        if (!this.stopped) {
+          await this.sendBotMessage(bot);
+          this.scheduleBotNext(bot);
+        }
+      }, offset + 3000); // Wait 3s after start for connections to establish
     });
   }
 
-  public sendAIMessage(message: string) {
-    if (message?.trim()) { this.aiQueue.push(message); this.processAIQueue(); }
-  }
+  private scheduleBotNext(bot: BotInstance): void {
+    if (this.stopped) return;
 
-  private async processManualQueue() {
-    if (this.isSendingManual || !this.manualQueue.length) return;
-    this.isSendingManual = true;
-    while (this.manualQueue.length) {
-      const msg = this.manualQueue.shift()!;
-      await this.sendMessage(msg);
-      if (this.manualQueue.length) await new Promise(r => setTimeout(r, 350));
-    }
-    this.isSendingManual = false;
-  }
+    // Random jitter ±20% of interval to feel more human
+    const jitter = (Math.random() * 0.4 - 0.2) * this.messageInterval;
+    const delay = Math.max(8000, this.messageInterval + jitter);
 
-  private async processAIQueue() {
-    if (this.isSendingAI || !this.aiQueue.length) return;
-    this.isSendingAI = true;
-    while (this.aiQueue.length) {
-      const msg = this.aiQueue.shift()!;
-      const sent = await this.sendMessage(msg);
-      if (sent) {
-        this.messageCount++;
-        this.onAISent?.(msg, this.botIndex, this.getUsername());
+    bot.messageTimer = setTimeout(async () => {
+      if (!this.stopped) {
+        await this.sendBotMessage(bot);
+        this.scheduleBotNext(bot);
       }
-      if (this.aiQueue.length) await new Promise(r => setTimeout(r, 2000));
-    }
-    this.isSendingAI = false;
+    }, delay);
   }
 
-  private async setupVoiceCapture(channel: string) {
-    try { await this.aiService.startVoiceCapture(channel); }
-    catch (e) { logger.error('Voice capture setup error:', e); }
-  }
+  private async sendBotMessage(bot: BotInstance): Promise<void> {
+    if (!bot.connected || this.stopped) return;
 
-  private async sendMessage(message: string): Promise<boolean> {
-    if (!this.client || !message) return false;
-    if (!this.isConnected) {
-      logger.warn(`Bot[${this.botIndex}] not connected, skip`);
-      return false;
-    }
     try {
-      const raw = process.env.TWITCH_CHANNEL!;
-      const ch = raw.includes('twitch.tv/')
-        ? raw.split('twitch.tv/')[1].split('/')[0].split('?')[0] : raw;
-      await this.client.say(`#${ch}`, message);
-      logger.info(`Bot[${this.botIndex}] SENT: "${message}"`);
-      return true;
-    } catch (e: any) {
-      logger.error(`Bot[${this.botIndex}] FAILED: ${e?.message}`);
-      return false;
+      const message = await this.ai.generateMessage(
+        bot.username,
+        this.streamContext,
+        this.language
+      );
+
+      if (!message) return;
+
+      await bot.client.say(`#${this.channel}`, message);
+      bot.messagesSent++;
+
+      this.emit('bot:message', {
+        username: bot.username,
+        message,
+        count: bot.messagesSent,
+      });
+    } catch (err: any) {
+      // Ignore "Not connected" errors during reconnection
+      if (!err.message?.includes('Not connected')) {
+        this.emit('bot:status', {
+          username: bot.username,
+          state: 'error',
+          message: err.message,
+        });
+      }
     }
   }
 
-  public connect() {
-    this.client?.connect().catch(e => {
-      const msg = String(e);
-      if (!msg.includes('Socket is not opened') && !msg.includes('Cannot disconnect'))
-        logger.error(`Bot[${this.botIndex}] connect error:`, e);
+  async stop(): Promise<void> {
+    this.stopped = true;
+
+    // Clear all timers
+    this.bots.forEach(bot => {
+      if (bot.messageTimer) clearTimeout(bot.messageTimer);
     });
+
+    // Disconnect all
+    const disconnects = Array.from(this.bots.values()).map(bot =>
+      bot.client.disconnect().catch(() => {})
+    );
+    await Promise.allSettled(disconnects);
+    this.bots.clear();
   }
 
-  public disconnect() {
-    this.manualQueue = []; this.aiQueue = [];
-    try { this.client?.disconnect(); } catch (_) {}
-    try { if (this.botIndex === 0) this.aiService.stopVoiceCapture(); } catch (_) {}
+  getBotUsernames(): string[] {
+    return Array.from(this.bots.keys());
   }
-
-  public isBotConnected() { return this.isConnected; }
-  public getUsername() { return this.client?.getUsername() || ''; }
-  public getBotIndex() { return this.botIndex; }
 }
