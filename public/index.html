@@ -3,1329 +3,504 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TwitchAI Boost — AI Viewers Panel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<title>TwitchBoost — AI Chat Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="/socket.io/socket.io.js"></script>
 <style>
-:root {
-  --bg: #0a0a0f;
-  --surface: #111118;
-  --card: #16161f;
-  --border: #1e1e2e;
-  --border2: #252535;
-  --purple: #7c3aed;
-  --purple2: #6d28d9;
-  --violet: #8b5cf6;
-  --pink: #ec4899;
-  --cyan: #06b6d4;
-  --green: #10b981;
-  --yellow: #f59e0b;
-  --red: #ef4444;
-  --text: #f1f0ff;
-  --text2: #a09fbb;
-  --text3: #6b6a88;
-  --glow: rgba(124, 58, 237, 0.3);
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#111114;--surface:#18181c;--card:#1e1e24;--border:#2a2a32;--border2:#333340;
+  --purple:#7c3aed;--pl:#9d5cf6;--pdim:rgba(124,58,237,0.15);
+  --text:#e8e8f0;--text2:#9898b0;--text3:#55556a;
+  --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--cyan:#06b6d4;
 }
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Syne', sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Background grid */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Ambient glow */
-body::after {
-  content: '';
-  position: fixed;
-  top: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.container {
-  position: relative;
-  z-index: 1;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-/* HEADER */
-header {
-  padding: 20px 0 16px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(10,10,15,0.9);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logo-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--purple), var(--pink));
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  box-shadow: 0 0 20px var(--glow);
-}
-
-.logo-text {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #fff 0%, var(--violet) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.logo-badge {
-  background: linear-gradient(135deg, var(--purple), var(--pink));
-  color: white;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  font-family: 'DM Mono', monospace;
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-#global-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-family: 'DM Mono', monospace;
-  color: var(--text2);
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text3);
-}
-.dot.active {
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
-  animation: pulse 2s infinite;
-}
-.dot.error { background: var(--red); }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* MAIN LAYOUT */
-main {
-  padding: 32px 0;
-}
-
-/* SETUP CARD */
-.setup-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 16px;
-  padding: 28px;
-  margin-bottom: 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.setup-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--purple), transparent);
-}
-
-.card-title {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--text3);
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.card-title span { color: var(--violet); }
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-@media (max-width: 640px) {
-  .form-grid { grid-template-columns: 1fr; }
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text2);
-  letter-spacing: 0.5px;
-  font-family: 'DM Mono', monospace;
-}
-
-.field input, .field select, .field textarea {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  padding: 11px 14px;
-  color: var(--text);
-  font-family: 'DM Mono', monospace;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  width: 100%;
-}
-
-.field input:focus, .field select:focus, .field textarea:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
-}
-
-.field input::placeholder { color: var(--text3); }
-.field textarea { resize: vertical; min-height: 80px; }
-.field select { cursor: pointer; }
-.field select option { background: var(--surface); }
-
-.full-width { grid-column: 1 / -1; }
-
-/* BOTS SECTION */
-.bots-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.bots-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-  max-height: 260px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.bots-list::-webkit-scrollbar { width: 4px; }
-.bots-list::-webkit-scrollbar-track { background: transparent; }
-.bots-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-.bot-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 36px;
-  gap: 8px;
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  transition: border-color 0.2s;
-}
-
-.bot-row:hover { border-color: var(--border2); }
-
-.bot-row input {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border2);
-  border-radius: 0;
-  padding: 4px 0;
-  color: var(--text);
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
-}
-
-.bot-row input:focus {
-  border-bottom-color: var(--purple);
-  box-shadow: none;
-}
-
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border2);
-  background: transparent;
-  border-radius: 8px;
-  color: var(--text3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover { border-color: var(--red); color: var(--red); background: rgba(239,68,68,0.05); }
-
-/* BUTTONS */
-.btn {
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-family: 'Syne', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  letter-spacing: 0.3px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--purple), var(--purple2));
-  color: white;
-  box-shadow: 0 4px 20px rgba(124,58,237,0.35);
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 28px rgba(124,58,237,0.5);
-}
-
-.btn-primary:active { transform: translateY(0); }
-
-.btn-danger {
-  background: rgba(239,68,68,0.1);
-  color: var(--red);
-  border: 1px solid rgba(239,68,68,0.2);
-}
-
-.btn-danger:hover { background: rgba(239,68,68,0.2); }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text2);
-  border: 1px solid var(--border2);
-}
-
-.btn-ghost:hover { border-color: var(--violet); color: var(--violet); }
-
-.btn-sm { padding: 7px 14px; font-size: 12px; }
-
-/* ACTION ROW */
-.action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* STATS GRID */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-@media (max-width: 768px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.stat-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 14px;
-  padding: 18px 20px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.2s, transform 0.2s;
-}
-
-.stat-card:hover { border-color: var(--border2); transform: translateY(-1px); }
-
-.stat-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 2px;
-  border-radius: 0 0 14px 14px;
-}
-
-.stat-card.purple::after { background: var(--purple); }
-.stat-card.cyan::after { background: var(--cyan); }
-.stat-card.green::after { background: var(--green); }
-.stat-card.pink::after { background: var(--pink); }
-
-.stat-icon { font-size: 22px; margin-bottom: 12px; }
-.stat-val {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text);
-  line-height: 1;
-  margin-bottom: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-family: 'DM Mono', monospace;
-}
-
-/* BOTTOM GRID */
-.bottom-grid {
-  display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: 20px;
-}
-
-@media (max-width: 900px) {
-  .bottom-grid { grid-template-columns: 1fr; }
-}
-
-/* LOG */
-.log-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  height: 420px;
-}
-
-.log-header {
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.log-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.log-body::-webkit-scrollbar { width: 4px; }
-.log-body::-webkit-scrollbar-track { background: transparent; }
-.log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-.log-entry {
-  display: flex;
-  gap: 10px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  margin-bottom: 2px;
-  transition: background 0.1s;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.log-entry:hover { background: rgba(255,255,255,0.03); }
-
-.log-time { color: var(--text3); flex-shrink: 0; }
-.log-bot { flex-shrink: 0; }
-.log-msg { color: var(--text2); word-break: break-word; }
-
-.log-entry.info .log-bot { color: var(--cyan); }
-.log-entry.chat .log-bot { color: var(--violet); }
-.log-entry.error .log-bot { color: var(--red); }
-.log-entry.success .log-bot { color: var(--green); }
-.log-entry.warn .log-bot { color: var(--yellow); }
-.log-entry.ai .log-bot { color: var(--pink); }
-
-/* BOTS STATUS */
-.bots-status-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 16px;
-  height: 420px;
-  display: flex;
-  flex-direction: column;
-}
-
-.bots-status-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-}
-
-.bots-status-list::-webkit-scrollbar { width: 4px; }
-.bots-status-list::-webkit-scrollbar-track { background: transparent; }
-.bots-status-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-.bot-status-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  transition: border-color 0.2s;
-  animation: fadeIn 0.3s ease;
-}
-
-.bot-status-item:hover { border-color: var(--border2); }
-
-.bot-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple), var(--pink));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 800;
-  color: white;
-  flex-shrink: 0;
-  font-family: 'DM Mono', monospace;
-}
-
-.bot-info { flex: 1; min-width: 0; }
-.bot-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.bot-meta { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 2px; }
-
-.bot-state {
-  font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  padding: 3px 8px;
-  border-radius: 20px;
-  font-weight: 500;
-}
-
-.bot-state.connected { background: rgba(16,185,129,0.12); color: var(--green); }
-.bot-state.connecting { background: rgba(245,158,11,0.12); color: var(--yellow); }
-.bot-state.error { background: rgba(239,68,68,0.12); color: var(--red); }
-.bot-state.idle { background: rgba(107,106,136,0.12); color: var(--text3); }
-
-/* MSG COUNT BADGE */
-.msg-count {
-  font-size: 11px;
-  font-family: 'DM Mono', monospace;
-  color: var(--text3);
-  text-align: right;
-}
-
-/* STREAM INFO CARD */
-.stream-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.stream-card.live::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(236,72,153,0.04) 100%);
-  pointer-events: none;
-}
-
-.stream-thumb {
-  width: 100px;
-  height: 60px;
-  background: var(--surface);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.stream-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
-
-.stream-info { flex: 1; min-width: 0; }
-.stream-title { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stream-meta { font-size: 12px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 4px; }
-
-.live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(239,68,68,0.15);
-  color: var(--red);
-  border: 1px solid rgba(239,68,68,0.25);
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: 'DM Mono', monospace;
-  letter-spacing: 0.5px;
-}
-
-.offline-badge {
-  background: rgba(107,106,136,0.12);
-  color: var(--text3);
-  border: 1px solid var(--border);
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-family: 'DM Mono', monospace;
-}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px}
+
+/* TOP NAV */
+.topbar{height:44px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;justify-content:space-between;gap:12px}
+.logo{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;margin-right:20px;white-space:nowrap}
+.logo-icon{width:26px;height:26px;background:linear-gradient(135deg,var(--purple),#ec4899);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.nav-tabs{display:flex;gap:2px}
+.nav-tab{padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--text2);font-weight:500;transition:all .15s;border:none;background:transparent;font-size:13px;font-family:inherit}
+.nav-tab.active{background:var(--pdim);color:var(--pl)}
+.nav-tab:hover:not(.active){color:var(--text);background:rgba(255,255,255,.04)}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.meta-chip{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text3);padding:3px 8px;border-radius:5px}
+.meta-chip b{color:var(--text2);font-weight:500}
+.meta-sep{color:var(--border2)}
+.auth-badge{background:var(--pdim);color:var(--pl);border:1px solid rgba(124,58,237,.3);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block}
+.sdot.on{background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+.settings-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s}
+.settings-btn:hover{border-color:var(--purple);color:var(--pl)}
+
+/* LAYOUT */
+.layout{flex:1;display:grid;grid-template-columns:310px 1fr 275px;overflow:hidden;min-height:0}
+
+/* LEFT CHAT */
+.panel-left{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.ph{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ph-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3)}
+.chat-feed{flex:1;overflow-y:auto;padding:4px 0}
+.chat-feed::-webkit-scrollbar{width:3px}
+.chat-feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.cmsg{padding:4px 12px;display:flex;gap:7px;align-items:flex-start}
+.cmsg:hover{background:rgba(255,255,255,.02)}
+.cav{width:20px;height:20px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;margin-top:2px}
+.cbody .cname{font-size:12px;font-weight:600;margin-right:3px}
+.cbody .ctext{color:var(--text2);font-size:12px;line-height:1.45;word-break:break-word}
+.cmsg.sys .ctext{color:var(--text3);font-size:11px;font-style:italic}
+.chat-empty{text-align:center;padding:50px 16px;color:var(--text3);font-size:12px}
+
+/* BOTTOM INPUT */
+.input-zone{flex-shrink:0}
+.phrase-bar{padding:7px 10px 5px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px}
+.pbtn{padding:3px 9px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--text2);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.pbtn:hover{border-color:var(--purple);color:var(--pl);background:var(--pdim)}
+.padd{padding:3px 8px;background:transparent;border:1px dashed var(--border2);border-radius:20px;color:var(--text3);cursor:pointer;font-size:11px;transition:all .15s}
+.padd:hover{border-color:var(--purple);color:var(--pl)}
+.char-row{font-size:10px;color:var(--text3);text-align:right;padding:2px 12px 1px;font-family:monospace}
+.input-row{padding:6px 10px 10px;display:flex;gap:7px;align-items:flex-end}
+.msg-ta{flex:1;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:7px 11px;color:var(--text);font-family:inherit;font-size:13px;resize:none;outline:none;min-height:36px;max-height:80px;line-height:1.4;transition:border .15s}
+.msg-ta:focus{border-color:var(--purple)}
+.msg-ta::placeholder{color:var(--text3)}
+.send-btn{width:36px;height:36px;background:var(--purple);border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.send-btn:hover{background:var(--pl);transform:scale(1.05)}
+.send-btn svg{width:14px;height:14px;fill:#fff}
+
+/* CENTER STREAM */
+.panel-center{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.stream-topbar{height:40px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:0;flex-shrink:0;background:var(--surface)}
+.stb-item{font-size:12px;color:var(--text3);padding:0 10px;border-right:1px solid var(--border);height:100%;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.stb-item:last-child{border-right:none}
+.stb-item b{color:var(--text2);font-weight:500}
+.stream-frame{flex:1;position:relative;background:#0a0a0c}
+.stream-frame iframe{width:100%;height:100%;border:none;display:block}
+.stream-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text3)}
+.stream-ph .icon{font-size:40px;opacity:.25}
+.info-bar{padding:7px 14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);flex-shrink:0}
+.ib-left{display:flex;align-items:center;gap:8px}
+.live-pill{display:flex;align-items:center;gap:4px;background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.ch-name{font-weight:600;font-size:13px}
+.ib-right{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text3)}
+.expand-btn{padding:4px 10px;background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--text3);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s}
+.expand-btn:hover{border-color:var(--border);color:var(--text2)}
+
+/* RIGHT ACCOUNTS */
+.panel-right{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.acc-head{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.acc-label{font-size:11px;color:var(--text3);text-align:center;margin-bottom:7px}
+.acc-tabs{display:flex;gap:3px}
+.atab{flex:1;padding:5px 4px;border-radius:6px;cursor:pointer;color:var(--text2);font-size:11px;font-weight:500;border:none;background:var(--card);font-family:inherit;transition:all .15s;text-align:center}
+.atab.active{background:var(--purple);color:#fff}
+.atab:hover:not(.active){background:var(--border2);color:var(--text)}
+.acc-search{display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 9px;margin:6px 12px 0}
+.acc-search input{background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;outline:none;flex:1}
+.acc-search input::placeholder{color:var(--text3)}
+.acc-list{flex:1;overflow-y:auto;padding:7px}
+.acc-list::-webkit-scrollbar{width:3px}
+.acc-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.acc-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px;border:1px solid transparent;cursor:pointer;transition:all .15s;margin-bottom:3px;position:relative}
+.acc-item:hover{background:var(--card);border-color:var(--border)}
+.acc-item.sel{background:var(--card);border-color:var(--purple)}
+.acc-item.sel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--purple);border-radius:2px 0 0 2px}
+.ava{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
+.ai-info{flex:1;min-width:0}
+.ai-name{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.ai-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.adot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.adot.on{background:var(--green);box-shadow:0 0 5px var(--green)}
+.adot.err{background:var(--red)}
+.adot.conn{background:var(--yellow);animation:blink 1s infinite}
+.amsg{font-size:10px;color:var(--text3);font-family:monospace}
+.acc-footer{padding:8px 12px;border-top:1px solid var(--border);flex-shrink:0}
+.sel-all-btn{width:100%;padding:6px;background:var(--card);border:1px solid var(--border2);border-radius:6px;color:var(--text2);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s}
+.sel-all-btn:hover{border-color:var(--purple);color:var(--pl)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:20px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal-title{font-weight:700;margin-bottom:14px;font-size:14px}
+.mfield{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+.mfield label{font-size:11px;color:var(--text3)}
+.mfield input,.mfield textarea{background:var(--surface);border:1px solid var(--border2);border-radius:7px;padding:7px 10px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border .15s}
+.mfield input:focus,.mfield textarea:focus{border-color:var(--purple)}
+.mfield textarea{resize:vertical;min-height:65px}
+.mbtns{display:flex;gap:7px;justify-content:flex-end}
+.btn-c{padding:6px 13px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--text2);cursor:pointer;font-family:inherit;font-size:12px}
+.btn-ok{padding:6px 13px;background:var(--purple);border:none;border-radius:6px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px}
 
 /* TOAST */
-.toast-container {
-  position: fixed;
-  top: 80px;
-  right: 24px;
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.toast {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  animation: slideIn 0.3s ease;
-  max-width: 300px;
-}
-
-@keyframes slideIn {
-  from { transform: translateX(120%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-@keyframes slideOut {
-  to { transform: translateX(120%); opacity: 0; }
-}
-
-.toast.success { border-left: 3px solid var(--green); }
-.toast.error { border-left: 3px solid var(--red); }
-.toast.info { border-left: 3px solid var(--cyan); }
-
-/* EMPTY STATE */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text3);
-  font-size: 13px;
-  font-family: 'DM Mono', monospace;
-}
-
-.empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
-
-/* Progress bar */
-.progress-bar {
-  height: 3px;
-  background: var(--border);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 8px;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--purple), var(--pink));
-  border-radius: 2px;
-  transition: width 0.5s ease;
-}
-
-/* Toggle */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.toggle-row:last-child { border-bottom: none; }
-
-.toggle-label { font-size: 13px; color: var(--text2); }
-.toggle-sub { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 2px; }
-
-.toggle {
-  width: 40px;
-  height: 22px;
-  background: var(--border2);
-  border-radius: 11px;
-  position: relative;
-  cursor: pointer;
-  border: none;
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-
-.toggle.on { background: var(--purple); }
-
-.toggle::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  background: white;
-  border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-.toggle.on::after { transform: translateX(18px); }
-
-/* Number input with arrows */
-.number-field {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.number-field button {
-  width: 32px;
-  height: 38px;
-  background: transparent;
-  border: none;
-  color: var(--text3);
-  cursor: pointer;
-  font-size: 16px;
-  transition: color 0.2s;
-  flex-shrink: 0;
-}
-
-.number-field button:hover { color: var(--violet); }
-
-.number-field input {
-  flex: 1;
-  text-align: center;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 8px 4px;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-}
-
-/* Section divider */
-.section-gap { margin-bottom: 24px; }
+.toasts{position:fixed;bottom:18px;right:18px;z-index:300;display:flex;flex-direction:column;gap:5px}
+.toast{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:9px 13px;font-size:12px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:ti .2s ease;max-width:280px}
+@keyframes ti{from{transform:translateX(60px);opacity:0}to{transform:none;opacity:1}}
+.toast.ok{border-left:3px solid var(--green)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--pl)}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="header-inner">
+<div class="topbar">
+  <div style="display:flex;align-items:center">
     <div class="logo">
       <div class="logo-icon">🤖</div>
-      <div class="logo-text">TwitchAI Boost</div>
-      <div class="logo-badge">Beta</div>
+      TwitchBoost
     </div>
-    <div class="status-bar">
-      <div id="global-status">
-        <div class="dot" id="status-dot"></div>
-        <span id="status-text">Отключено</span>
-      </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active">Чат</button>
+      <button class="nav-tab">Аккаунты</button>
+      <button class="nav-tab">Операторы</button>
     </div>
   </div>
-</header>
-
-<div class="toast-container" id="toasts"></div>
-
-<main>
-<div class="container">
-
-  <!-- STREAM INFO -->
-  <div class="stream-card section-gap" id="stream-card">
-    <div class="stream-thumb" id="stream-thumb">📺</div>
-    <div class="stream-info">
-      <div class="stream-title" id="stream-title">Канал не задан</div>
-      <div class="stream-meta" id="stream-meta">Введите канал ниже и запустите ботов</div>
-    </div>
-    <div id="stream-badge" class="offline-badge">OFFLINE</div>
+  <div class="topbar-right">
+    <div class="meta-chip">Канал — <b id="mc">—</b></div>
+    <span class="meta-sep">·</span>
+    <div class="meta-chip">Аккаунты — <span class="auth-badge" id="ma">0</span></div>
+    <span class="meta-sep">·</span>
+    <div class="meta-chip">Авторизовано аккаунтов — <span class="auth-badge" id="mauth">0</span></div>
+    <span class="meta-sep">·</span>
+    <div class="meta-chip"><span class="sdot" id="sdot"></span> <b id="gstatus">Не запущено</b></div>
+    <button class="settings-btn" onclick="showSettings()">✕ Настроить</button>
   </div>
-
-  <!-- STATS -->
-  <div class="stats-grid section-gap">
-    <div class="stat-card purple">
-      <div class="stat-icon">👥</div>
-      <div class="stat-val" id="stat-bots">0</div>
-      <div class="stat-label">Активных ботов</div>
-    </div>
-    <div class="stat-card cyan">
-      <div class="stat-icon">👁️</div>
-      <div class="stat-val" id="stat-viewers">—</div>
-      <div class="stat-label">Онлайн зрителей</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-icon">💬</div>
-      <div class="stat-val" id="stat-messages">0</div>
-      <div class="stat-label">AI сообщений</div>
-    </div>
-    <div class="stat-card pink">
-      <div class="stat-icon">⏱️</div>
-      <div class="stat-val" id="stat-uptime">00:00</div>
-      <div class="stat-label">Время работы</div>
-    </div>
-  </div>
-
-  <!-- SETUP -->
-  <div class="setup-card section-gap">
-    <div class="card-title">⚙️ <span>Настройка</span></div>
-
-    <div class="form-grid">
-      <div class="field">
-        <label>КАНАЛ TWITCH</label>
-        <input type="text" id="channel" placeholder="username" />
-      </div>
-      <div class="field">
-        <label>GROQ API KEY</label>
-        <input type="password" id="groq-key" placeholder="gsk_..." />
-      </div>
-      <div class="field">
-        <label>ИНТЕРВАЛ СООБЩЕНИЙ (сек)</label>
-        <div class="number-field">
-          <button onclick="changeNum('msg-interval',-5)">−</button>
-          <input type="number" id="msg-interval" value="30" min="10" max="300" />
-          <button onclick="changeNum('msg-interval',5)">+</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>ЯЗЫК СТРИМА</label>
-        <select id="stream-lang">
-          <option value="ru">🇷🇺 Русский</option>
-          <option value="en">🇺🇸 English</option>
-          <option value="kk">🇰🇿 Қазақша</option>
-        </select>
-      </div>
-      <div class="field full-width">
-        <label>ТЕМА / КОНТЕКСТ СТРИМА (опционально)</label>
-        <textarea id="stream-context" placeholder="Например: Играю в CS2, рейтинговый матч, надеваю рандомное оружие..."></textarea>
-      </div>
-    </div>
-
-    <!-- AI SETTINGS -->
-    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
-      <div class="card-title" style="margin-bottom:12px">🧠 <span>AI параметры</span></div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Уникальные сообщения для каждого бота</div>
-          <div class="toggle-sub">Каждый бот имеет свой характер и стиль письма</div>
-        </div>
-        <button class="toggle on" id="toggle-unique" onclick="toggleBtn(this)"></button>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Контекст чата (читает другие сообщения)</div>
-          <div class="toggle-sub">Боты реагируют на то, что пишут в чате</div>
-        </div>
-        <button class="toggle on" id="toggle-context" onclick="toggleBtn(this)"></button>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Эмодзи в сообщениях</div>
-          <div class="toggle-sub">Использовать Twitch-эмодзи и смайлы</div>
-        </div>
-        <button class="toggle on" id="toggle-emoji" onclick="toggleBtn(this)"></button>
-      </div>
-    </div>
-  </div>
-
-  <!-- BOTS -->
-  <div class="setup-card section-gap">
-    <div class="bots-header">
-      <div class="card-title" style="margin:0">🤖 <span>Боты (аккаунты)</span></div>
-      <button class="btn btn-ghost btn-sm" onclick="addBot()">+ Добавить</button>
-    </div>
-
-    <div class="bots-list" id="bots-list">
-      <div class="bot-row">
-        <input type="text" placeholder="username" class="bot-username" />
-        <input type="password" placeholder="oauth:xxxxxxxx" class="bot-token" />
-        <button class="btn-icon" onclick="removeBot(this)" title="Удалить">×</button>
-      </div>
-    </div>
-
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:10px 12px; background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.15); border-radius:8px; font-size:12px; color:var(--text3); font-family:'DM Mono',monospace;">
-      💡 Получи OAuth токен: <a href="https://twitchapps.com/tmi/" target="_blank" style="color:var(--violet)">twitchapps.com/tmi</a>
-    </div>
-
-    <div class="action-row">
-      <button class="btn btn-primary" id="btn-start" onclick="startBots()">
-        ▶ Запустить
-      </button>
-      <button class="btn btn-danger" id="btn-stop" onclick="stopBots()" style="display:none">
-        ■ Остановить
-      </button>
-      <button class="btn btn-ghost btn-sm" onclick="saveConfig()">💾 Сохранить</button>
-    </div>
-  </div>
-
-  <!-- BOTTOM GRID -->
-  <div class="bottom-grid">
-
-    <!-- LOG -->
-    <div class="log-card">
-      <div class="log-header">
-        <div class="card-title" style="margin:0">📋 <span>Лог активности</span></div>
-        <button class="btn btn-ghost btn-sm" onclick="clearLog()">Очистить</button>
-      </div>
-      <div class="log-body" id="log-body">
-        <div class="empty-state">
-          <div class="empty-icon">📭</div>
-          Запустите ботов чтобы увидеть активность
-        </div>
-      </div>
-    </div>
-
-    <!-- BOTS STATUS -->
-    <div class="bots-status-card">
-      <div class="log-header">
-        <div class="card-title" style="margin:0">🟢 <span>Статус ботов</span></div>
-        <div id="connected-count" style="font-size:12px; font-family:'DM Mono',monospace; color:var(--text3)">0 / 0</div>
-      </div>
-      <div class="bots-status-list" id="bots-status-list">
-        <div class="empty-state">
-          <div class="empty-icon">🤖</div>
-          Боты не запущены
-        </div>
-      </div>
-    </div>
-
-  </div>
-
 </div>
-</main>
+
+<div class="layout">
+
+  <!-- CHAT LEFT -->
+  <div class="panel-left">
+    <div class="ph">
+      <span class="ph-title">Чат</span>
+      <button onclick="clearChat()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:inherit">Очистить</button>
+    </div>
+    <div class="chat-feed" id="chat-feed">
+      <div class="chat-empty">💬 Сообщения появятся здесь</div>
+    </div>
+    <div class="input-zone">
+      <div class="phrase-bar" id="phrase-bar"></div>
+      <div class="char-row"><span id="cc">0</span> / 1000</div>
+      <div class="input-row">
+        <textarea class="msg-ta" id="msginput" placeholder="Написать сообщение..." rows="1"
+          oninput="onInput(this)" onkeydown="onKey(event)"></textarea>
+        <button class="send-btn" onclick="sendManual()">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER STREAM -->
+  <div class="panel-center">
+    <div class="stream-topbar">
+      <div class="stb-item">Канал — <b id="sb-ch">—</b></div>
+      <div class="stb-item">Аккаунты — <b id="sb-acc">—</b></div>
+      <div class="stb-item">Шаблон из биллинга</div>
+      <div class="stb-item">Авторизовано аккаунтов — <span class="auth-badge" id="sb-auth">0</span></div>
+    </div>
+    <div class="stream-frame">
+      <div class="stream-ph" id="stream-ph">
+        <div class="icon">📺</div>
+        <p style="font-size:12px">Загрузка стрима...</p>
+      </div>
+      <iframe id="stream-iframe" style="display:none" allowfullscreen></iframe>
+    </div>
+    <div class="info-bar">
+      <div class="ib-left">
+        <div class="live-pill" id="live-pill" style="display:none">
+          <span class="sdot on" style="width:6px;height:6px"></span> LIVE
+        </div>
+        <span class="ch-name" id="ch-name">—</span>
+        <span style="font-size:12px;color:var(--text3)" id="game-name"></span>
+      </div>
+      <div class="ib-right">
+        <span>👁 <b id="viewer-cnt">—</b></span>
+        <span>⏱ <b id="uptime">00:00:00</b></span>
+        <button class="expand-btn" onclick="expandStream()">⤢ Развернуть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT ACCOUNTS -->
+  <div class="panel-right">
+    <div class="acc-head">
+      <div class="acc-label">Аккаунт для сообщения в чат</div>
+      <div class="acc-tabs">
+        <button class="atab active" onclick="setMode('selected',this)">Выбранные</button>
+        <button class="atab" onclick="setMode('random',this)">Случайный</button>
+        <button class="atab" onclick="setMode('order',this)">По порядку</button>
+      </div>
+    </div>
+    <div class="acc-search">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input placeholder="Поиск" oninput="filterAcc(this.value)">
+    </div>
+    <div class="acc-list" id="acc-list">
+      <div style="text-align:center;padding:30px 16px;color:var(--text3);font-size:12px">Ожидание ботов...</div>
+    </div>
+    <div class="acc-footer">
+      <button class="sel-all-btn" onclick="selAll()">Выбрать всех / снять выбор</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHRASE MODAL -->
+<div class="overlay" id="pmodal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">➕ Новая группа фраз</div>
+    <div class="mfield">
+      <label>Название кнопки</label>
+      <input id="pname" placeholder="Например: gg" />
+    </div>
+    <div class="mfield">
+      <label>Фразы (каждая с новой строки)</label>
+      <textarea id="ptexts" placeholder="GG&#10;gg wp&#10;хорошая игра!"></textarea>
+    </div>
+    <div class="mbtns">
+      <button class="btn-c" onclick="closePM()">Отмена</button>
+      <button class="btn-ok" onclick="savePG()">Добавить</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="pmodal" onclick="closePM()"></div>
+
+<div class="toasts" id="toasts"></div>
 
 <script>
 const socket = io();
-let running = false;
-let startTime = null;
-let uptimeTimer = null;
-let totalMessages = 0;
-let botStats = {};
-let logCount = 0;
+let bots = {}, sendMode = 'selected', orderIdx = 0;
+let startTime = null, uptimeTimer = null;
+let channelName = '';
 
-// ─── SOCKET EVENTS ─────────────────────────────────────────────────────────
+const COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#9333ea','#c2410c'];
+const bcmap = new Map();
+let ci = 0;
+function bc(u){ if(!bcmap.has(u)){bcmap.set(u,COLORS[ci++%COLORS.length]);} return bcmap.get(u); }
 
-socket.on('connect', () => {
-  addLog('system', 'Подключено к серверу', 'success');
-  loadConfig();
+const phraseGroups = {
+  'ахахха':['ахахаха','KEKW','хахаха','лол','😂','LUL','ахахахах'],
+  'приветствие':['привет всем!','здарова чат','хай!','чат, всем привет','йо!','привет стример!'],
+  'оски':['оски?','OMEGALUL','потнял','полегло','Pog','PogChamp','👀'],
+};
+
+// ── SOCKET ──
+socket.on('connect', ()=>{ socket.emit('get:config'); });
+
+socket.on('config', cfg=>{
+  channelName = cfg.channel||'';
+  document.getElementById('mc').textContent = channelName||'—';
+  document.getElementById('sb-ch').textContent = channelName||'—';
+  document.getElementById('ch-name').textContent = channelName||'—';
+  if(channelName) loadEmbed(channelName);
 });
 
-socket.on('disconnect', () => {
-  addLog('system', 'Соединение потеряно', 'error');
-  setStatus(false);
+socket.on('bots:started', d=>{
+  startTime=Date.now();
+  document.getElementById('sdot').className='sdot on';
+  document.getElementById('gstatus').textContent='Запущено';
+  document.getElementById('ma').textContent=d.bots.length;
+  document.getElementById('mauth').textContent=d.bots.length;
+  document.getElementById('sb-acc').textContent=d.bots.length;
+  document.getElementById('sb-auth').textContent=d.bots.length;
+  startUptime();
+  d.bots.forEach(u=>{ bots[u]={state:'connecting',messages:0,selected:true}; });
+  renderAcc();
+  sysMsg('Запущено '+d.bots.length+' ботов для #'+channelName);
+  toast('ok','✅ Запущено '+d.bots.length+' ботов');
 });
 
-socket.on('bot:status', (data) => {
-  updateBotStatus(data.username, data.state, data.message);
-  if (data.state === 'connected') addLog(data.username, 'Подключён к чату', 'success');
-  if (data.state === 'error') addLog(data.username, data.message || 'Ошибка', 'error');
-  if (data.state === 'reconnecting') addLog(data.username, 'Переподключение...', 'warn');
-  updateConnectedCount();
-  updateStatBots();
+socket.on('bot:status', d=>{
+  if(!bots[d.username]) bots[d.username]={state:d.state,messages:0,selected:true};
+  else bots[d.username].state=d.state;
+  updateBotDot(d.username);
+  if(d.state==='error') sysMsg('⚠️ '+d.username+': '+(d.message||'ошибка'));
 });
 
-socket.on('bot:message', (data) => {
-  totalMessages++;
-  document.getElementById('stat-messages').textContent = totalMessages;
-  addLog(data.username, `💬 ${data.message}`, 'chat');
-  updateBotMessageCount(data.username);
+socket.on('bot:message', d=>{
+  if(!bots[d.username]) bots[d.username]={state:'connected',messages:0,selected:true};
+  bots[d.username].messages=(bots[d.username].messages||0)+1;
+  chatMsg(d.username,d.message,'ai');
+  const el=document.getElementById('amsg-'+d.username);
+  if(el) el.textContent=bots[d.username].messages+' msg';
 });
 
-socket.on('stream:info', (data) => {
-  updateStreamInfo(data);
+socket.on('stream:viewers', d=>{
+  document.getElementById('viewer-cnt').textContent=d.viewers.toLocaleString();
 });
-
-socket.on('stream:viewers', (data) => {
-  document.getElementById('stat-viewers').textContent = data.viewers.toLocaleString();
+socket.on('stream:info', d=>{
+  if(d.live){
+    document.getElementById('live-pill').style.display='flex';
+    if(d.game) document.getElementById('game-name').textContent='· '+d.game;
+  }
+  if(d.viewers) document.getElementById('viewer-cnt').textContent=d.viewers.toLocaleString();
 });
+socket.on('error', d=>{ toast('err','❌ '+d.message); sysMsg('❌ '+d.message); });
 
-socket.on('bots:started', (data) => {
-  running = true;
-  startTime = Date.now();
-  setStatus(true);
-  document.getElementById('btn-start').style.display = 'none';
-  document.getElementById('btn-stop').style.display = '';
-  startUptimeTimer();
-  renderBotStatusList(data.bots || []);
-  addLog('system', `Запущено ${data.bots?.length || 0} ботов`, 'success');
-  showToast('success', `✅ Запущено ${data.bots?.length || 0} ботов`);
-});
-
-socket.on('bots:stopped', () => {
-  running = false;
-  setStatus(false);
-  document.getElementById('btn-start').style.display = '';
-  document.getElementById('btn-stop').style.display = 'none';
-  stopUptimeTimer();
-  addLog('system', 'Боты остановлены', 'warn');
-  showToast('info', '⏹ Боты остановлены');
-  Object.keys(botStats).forEach(u => updateBotStatus(u, 'idle', 'Остановлен'));
-});
-
-socket.on('error', (data) => {
-  addLog('system', data.message, 'error');
-  showToast('error', '❌ ' + data.message);
-});
-
-// ─── CONTROLS ──────────────────────────────────────────────────────────────
-
-function startBots() {
-  const channel = document.getElementById('channel').value.trim();
-  const groqKey = document.getElementById('groq-key').value.trim();
-  const interval = parseInt(document.getElementById('msg-interval').value);
-  const lang = document.getElementById('stream-lang').value;
-  const context = document.getElementById('stream-context').value.trim();
-
-  const bots = getBotList();
-
-  if (!channel) return showToast('error', '❌ Укажи канал Twitch');
-  if (!groqKey) return showToast('error', '❌ Введи Groq API ключ');
-  if (bots.length === 0) return showToast('error', '❌ Добавь хотя бы одного бота');
-
-  const settings = {
-    uniquePersonas: document.getElementById('toggle-unique').classList.contains('on'),
-    chatContext: document.getElementById('toggle-context').classList.contains('on'),
-    useEmoji: document.getElementById('toggle-emoji').classList.contains('on'),
-  };
-
-  socket.emit('bots:start', { channel, groqKey, interval, lang, context, bots, settings });
-  addLog('system', 'Запуск ботов...', 'info');
+// ── EMBED ──
+function loadEmbed(ch){
+  const iframe=document.getElementById('stream-iframe');
+  const ph=document.getElementById('stream-ph');
+  const host=window.location.hostname||'localhost';
+  iframe.src=`https://player.twitch.tv/?channel=${ch}&parent=${host}&muted=true`;
+  iframe.style.display='block'; ph.style.display='none';
+}
+function expandStream(){
+  const el=document.querySelector('.stream-frame');
+  if(document.fullscreenElement) document.exitFullscreen();
+  else el.requestFullscreen?.();
 }
 
-function stopBots() {
-  socket.emit('bots:stop');
-}
-
-function getBotList() {
-  const rows = document.querySelectorAll('.bot-row');
-  const bots = [];
-  rows.forEach(row => {
-    const u = row.querySelector('.bot-username').value.trim();
-    const t = row.querySelector('.bot-token').value.trim();
-    if (u && t) bots.push({ username: u, token: t });
+// ── ACCOUNTS ──
+function renderAcc(filter=''){
+  const list=document.getElementById('acc-list');
+  const names=Object.keys(bots).filter(u=>!filter||u.toLowerCase().includes(filter.toLowerCase()));
+  if(names.length===0){list.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">Нет аккаунтов</div>';return;}
+  list.innerHTML='';
+  names.forEach(u=>{
+    const b=bots[u], color=bc(u), dc=b.state==='connected'?'on':b.state==='connecting'?'conn':b.state==='error'?'err':'';
+    const d=document.createElement('div');
+    d.className='acc-item'+(b.selected?' sel':'');
+    d.id='ai-'+u;
+    d.onclick=()=>toggleSel(u);
+    d.innerHTML=`
+      <div class="ava" style="background:${color}">${u[0].toUpperCase()}</div>
+      <div class="ai-info"><div class="ai-name">${esc(u)}</div><div class="ai-sub">${b.state}</div></div>
+      <div class="ai-right">
+        <div class="adot ${dc}" id="adot-${u}"></div>
+        <div class="amsg" id="amsg-${u}">${b.messages||0} msg</div>
+      </div>`;
+    list.appendChild(d);
   });
-  return bots;
+}
+function updateBotDot(u){
+  const d=document.getElementById('adot-'+u);
+  const s=document.querySelector(`#ai-${u} .ai-sub`);
+  if(!d||!bots[u])return;
+  const dc=bots[u].state==='connected'?'on':bots[u].state==='connecting'?'conn':bots[u].state==='error'?'err':'';
+  d.className='adot '+dc;
+  if(s) s.textContent=bots[u].state;
+}
+function toggleSel(u){
+  bots[u].selected=!bots[u].selected;
+  const el=document.getElementById('ai-'+u);
+  if(el) el.className='acc-item'+(bots[u].selected?' sel':'');
+}
+function selAll(){
+  const all=Object.values(bots).every(b=>b.selected);
+  Object.keys(bots).forEach(u=>{bots[u].selected=!all;});
+  renderAcc();
+}
+function filterAcc(v){renderAcc(v);}
+function setMode(m,btn){
+  sendMode=m;
+  document.querySelectorAll('.atab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+function getTargets(){
+  const conn=Object.keys(bots).filter(u=>bots[u].state==='connected');
+  if(!conn.length) return [];
+  if(sendMode==='selected'){const s=conn.filter(u=>bots[u].selected);return s.length?s:conn;}
+  if(sendMode==='random') return [conn[Math.floor(Math.random()*conn.length)]];
+  if(sendMode==='order'){const b=conn[orderIdx%conn.length];orderIdx++;return [b];}
+  return conn;
 }
 
-function addBot() {
-  const list = document.getElementById('bots-list');
-  const row = document.createElement('div');
-  row.className = 'bot-row';
-  row.innerHTML = `
-    <input type="text" placeholder="username" class="bot-username" />
-    <input type="password" placeholder="oauth:xxxxxxxx" class="bot-token" />
-    <button class="btn-icon" onclick="removeBot(this)" title="Удалить">×</button>
-  `;
-  list.appendChild(row);
+// ── CHAT ──
+function chatMsg(username,text,type='ai'){
+  const feed=document.getElementById('chat-feed');
+  const emp=feed.querySelector('.chat-empty');
+  if(emp) emp.remove();
+  const color=bc(username);
+  const d=document.createElement('div');
+  d.className='cmsg '+type;
+  d.innerHTML=`<div class="cav" style="background:${color}">${username[0].toUpperCase()}</div><div class="cbody"><span class="cname" style="color:${color}">${esc(username)}:</span><span class="ctext">${esc(text)}</span></div>`;
+  feed.appendChild(d);
+  feed.scrollTop=feed.scrollHeight;
+  while(feed.children.length>200) feed.removeChild(feed.firstChild);
+}
+function sysMsg(t){
+  const feed=document.getElementById('chat-feed');
+  const d=document.createElement('div');
+  d.className='cmsg sys';
+  d.innerHTML=`<div class="cbody"><span class="ctext">${esc(t)}</span></div>`;
+  feed.appendChild(d); feed.scrollTop=feed.scrollHeight;
+}
+function clearChat(){
+  document.getElementById('chat-feed').innerHTML='<div class="chat-empty">💬 Лог очищен</div>';
 }
 
-function removeBot(btn) {
-  const rows = document.querySelectorAll('.bot-row');
-  if (rows.length <= 1) return showToast('info', 'Нужен хотя бы один бот');
-  btn.closest('.bot-row').remove();
+// ── SEND ──
+function sendManual(){
+  const inp=document.getElementById('msginput');
+  const txt=inp.value.trim();
+  if(!txt) return;
+  const targets=getTargets();
+  if(!targets.length) return toast('err','Нет подключённых ботов');
+  socket.emit('send:manual',{targets,message:txt});
+  targets.forEach(t=>chatMsg(t,txt,'user-sent'));
+  inp.value=''; onInput(inp);
+}
+function onKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendManual();}}
+function onInput(el){
+  document.getElementById('cc').textContent=el.value.length;
+  el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,80)+'px';
 }
 
-// ─── CONFIG SAVE/LOAD ──────────────────────────────────────────────────────
-
-function saveConfig() {
-  const cfg = {
-    channel: document.getElementById('channel').value,
-    groqKey: document.getElementById('groq-key').value,
-    interval: document.getElementById('msg-interval').value,
-    lang: document.getElementById('stream-lang').value,
-    context: document.getElementById('stream-context').value,
-    bots: getBotList(),
-  };
-  try {
-    sessionStorage.setItem('twitchai_cfg', JSON.stringify(cfg));
-    showToast('success', '💾 Сохранено');
-  } catch(e) { showToast('error', 'Ошибка сохранения'); }
+// ── PHRASES ──
+function sendPhrase(group){
+  const phrases=phraseGroups[group];
+  if(!phrases||!phrases.length) return;
+  const txt=phrases[Math.floor(Math.random()*phrases.length)];
+  const targets=getTargets();
+  if(!targets.length) return toast('err','Нет ботов');
+  socket.emit('send:manual',{targets,message:txt});
+  targets.forEach(t=>chatMsg(t,txt,'user-sent'));
 }
-
-function loadConfig() {
-  try {
-    const raw = sessionStorage.getItem('twitchai_cfg');
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    if (cfg.channel) document.getElementById('channel').value = cfg.channel;
-    if (cfg.groqKey) document.getElementById('groq-key').value = cfg.groqKey;
-    if (cfg.interval) document.getElementById('msg-interval').value = cfg.interval;
-    if (cfg.lang) document.getElementById('stream-lang').value = cfg.lang;
-    if (cfg.context) document.getElementById('stream-context').value = cfg.context;
-    if (cfg.bots && cfg.bots.length > 0) {
-      const list = document.getElementById('bots-list');
-      list.innerHTML = '';
-      cfg.bots.forEach(b => {
-        const row = document.createElement('div');
-        row.className = 'bot-row';
-        row.innerHTML = `
-          <input type="text" placeholder="username" class="bot-username" value="${b.username}" />
-          <input type="password" placeholder="oauth:xxxxxxxx" class="bot-token" value="${b.token}" />
-          <button class="btn-icon" onclick="removeBot(this)" title="Удалить">×</button>
-        `;
-        list.appendChild(row);
-      });
-    }
-  } catch(e) {}
-}
-
-// ─── UI HELPERS ────────────────────────────────────────────────────────────
-
-function addLog(bot, msg, type = 'info') {
-  const body = document.getElementById('log-body');
-  
-  // Remove empty state
-  const empty = body.querySelector('.empty-state');
-  if (empty) empty.remove();
-
-  logCount++;
-  if (logCount > 200) {
-    body.removeChild(body.firstChild);
-    logCount--;
-  }
-
-  const now = new Date();
-  const time = now.toTimeString().slice(0,8);
-  
-  const entry = document.createElement('div');
-  entry.className = `log-entry ${type}`;
-  entry.innerHTML = `
-    <span class="log-time">${time}</span>
-    <span class="log-bot">[${bot}]</span>
-    <span class="log-msg">${escHtml(msg)}</span>
-  `;
-  body.appendChild(entry);
-  body.scrollTop = body.scrollHeight;
-}
-
-function clearLog() {
-  const body = document.getElementById('log-body');
-  body.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div>Лог очищен</div>';
-  logCount = 0;
-}
-
-function setStatus(active) {
-  const dot = document.getElementById('status-dot');
-  const text = document.getElementById('status-text');
-  if (active) {
-    dot.className = 'dot active';
-    text.textContent = 'Работает';
-  } else {
-    dot.className = 'dot';
-    text.textContent = 'Остановлено';
-  }
-}
-
-function renderBotStatusList(bots) {
-  const list = document.getElementById('bots-status-list');
-  list.innerHTML = '';
-  botStats = {};
-  bots.forEach(u => {
-    botStats[u] = { state: 'connecting', messages: 0 };
-    const item = createBotStatusItem(u);
-    list.appendChild(item);
+function renderPhrases(){
+  const bar=document.getElementById('phrase-bar');
+  bar.innerHTML='';
+  Object.keys(phraseGroups).forEach(g=>{
+    const b=document.createElement('button');
+    b.className='pbtn'; b.textContent=g; b.onclick=()=>sendPhrase(g);
+    bar.appendChild(b);
   });
-  updateConnectedCount();
-  updateStatBots();
+  const a=document.createElement('button');
+  a.className='padd'; a.textContent='+'; a.title='Добавить группу'; a.onclick=openPM;
+  bar.appendChild(a);
+}
+function openPM(){document.getElementById('pmodal').classList.add('open');}
+function closePM(){document.getElementById('pmodal').classList.remove('open');document.getElementById('pname').value='';document.getElementById('ptexts').value='';}
+function savePG(){
+  const name=document.getElementById('pname').value.trim();
+  const texts=document.getElementById('ptexts').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!name||!texts.length) return toast('err','Заполни поля');
+  phraseGroups[name]=texts; renderPhrases(); closePM();
+  toast('ok','✅ Группа "'+name+'" добавлена');
+}
+document.getElementById('pmodal').addEventListener('click',function(e){if(e.target===this)closePM();});
+
+// ── UPTIME ──
+function startUptime(){
+  uptimeTimer=setInterval(()=>{
+    const d=Date.now()-startTime;
+    const h=String(Math.floor(d/3600000)).padStart(2,'0');
+    const m=String(Math.floor((d%3600000)/60000)).padStart(2,'0');
+    const s=String(Math.floor((d%60000)/1000)).padStart(2,'0');
+    document.getElementById('uptime').textContent=`${h}:${m}:${s}`;
+  },1000);
 }
 
-function createBotStatusItem(username) {
-  const item = document.createElement('div');
-  item.className = 'bot-status-item';
-  item.id = `bot-item-${username.replace(/[^a-z0-9]/gi,'_')}`;
-  const initial = username.charAt(0).toUpperCase();
-  item.innerHTML = `
-    <div class="bot-avatar">${initial}</div>
-    <div class="bot-info">
-      <div class="bot-name">${escHtml(username)}</div>
-      <div class="bot-meta" id="bot-meta-${username.replace(/[^a-z0-9]/gi,'_')}">Подключение...</div>
-    </div>
-    <div>
-      <div class="bot-state connecting" id="bot-state-${username.replace(/[^a-z0-9]/gi,'_')}">connecting</div>
-      <div class="msg-count" id="bot-msgs-${username.replace(/[^a-z0-9]/gi,'_')}">0 msg</div>
-    </div>
-  `;
-  return item;
+function showSettings(){toast('info','⚙️ Настройки — через переменные Railway');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(type,msg){
+  const w=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast '+type; t.textContent=msg;
+  w.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .25s';setTimeout(()=>t.remove(),250);},3000);
 }
 
-function updateBotStatus(username, state, message) {
-  const key = username.replace(/[^a-z0-9]/gi,'_');
-  if (!botStats[username]) {
-    botStats[username] = { state, messages: 0 };
-    const list = document.getElementById('bots-status-list');
-    const empty = list.querySelector('.empty-state');
-    if (empty) empty.remove();
-    list.appendChild(createBotStatusItem(username));
-  } else {
-    botStats[username].state = state;
-  }
-  
-  const stateEl = document.getElementById(`bot-state-${key}`);
-  const metaEl = document.getElementById(`bot-meta-${key}`);
-  if (stateEl) {
-    stateEl.className = `bot-state ${state}`;
-    stateEl.textContent = state;
-  }
-  if (metaEl && message) metaEl.textContent = message;
-}
-
-function updateBotMessageCount(username) {
-  const key = username.replace(/[^a-z0-9]/gi,'_');
-  if (!botStats[username]) botStats[username] = { state: 'connected', messages: 0 };
-  botStats[username].messages = (botStats[username].messages || 0) + 1;
-  const el = document.getElementById(`bot-msgs-${key}`);
-  if (el) el.textContent = `${botStats[username].messages} msg`;
-}
-
-function updateConnectedCount() {
-  const total = Object.keys(botStats).length;
-  const connected = Object.values(botStats).filter(b => b.state === 'connected').length;
-  document.getElementById('connected-count').textContent = `${connected} / ${total}`;
-}
-
-function updateStatBots() {
-  const active = Object.values(botStats).filter(b => b.state === 'connected').length;
-  document.getElementById('stat-bots').textContent = active;
-}
-
-function updateStreamInfo(data) {
-  if (data.live) {
-    document.getElementById('stream-badge').className = 'live-badge';
-    document.getElementById('stream-badge').innerHTML = '<span class="dot active" style="width:6px;height:6px;"></span> LIVE';
-    document.getElementById('stream-card').classList.add('live');
-  }
-  if (data.title) document.getElementById('stream-title').textContent = data.title;
-  if (data.meta) document.getElementById('stream-meta').textContent = data.meta;
-  if (data.thumbnail) {
-    const thumb = document.getElementById('stream-thumb');
-    thumb.innerHTML = `<img src="${data.thumbnail}" alt="stream" />`;
-  }
-}
-
-function showToast(type, msg) {
-  const container = document.getElementById('toasts');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = msg;
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.animation = 'slideOut 0.3s ease forwards';
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
-}
-
-function toggleBtn(btn) {
-  btn.classList.toggle('on');
-}
-
-function changeNum(id, delta) {
-  const el = document.getElementById(id);
-  const val = parseInt(el.value) + delta;
-  const min = parseInt(el.min) || 0;
-  const max = parseInt(el.max) || 9999;
-  el.value = Math.max(min, Math.min(max, val));
-}
-
-function startUptimeTimer() {
-  uptimeTimer = setInterval(() => {
-    const diff = Date.now() - startTime;
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    document.getElementById('stat-uptime').textContent =
-      String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
-  }, 1000);
-}
-
-function stopUptimeTimer() {
-  clearInterval(uptimeTimer);
-  document.getElementById('stat-uptime').textContent = '00:00';
-}
-
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+renderPhrases();
 </script>
 </body>
 </html>
