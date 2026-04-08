@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -6,165 +7,138 @@ import axios from 'axios';
 import { BotManager } from './bot';
 
 const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-});
+const http = createServer(app);
+const io = new Server(http, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 3000;
 
-let botManager: BotManager | null = null;
-let streamInfoInterval: NodeJS.Timeout | null = null;
-let twitchAccessToken: string | null = null;
+// ── READ CONFIG FROM ENV ─────────────────────────────────────────────────────
+function readConfig() {
+  const channel = (process.env.TWITCH_CHANNEL || '').replace(/^#/, '').trim();
+  const groqKey = (process.env.GROQ_API_KEY || '').trim();
+  const language = (process.env.ORIGINAL_STREAM_LANGUAGE || 'ru').trim();
+  const interval = parseInt(process.env.MESSAGE_INTERVAL || '30');
+  const context = (process.env.STREAM_CONTEXT || '').trim();
 
-// ─── TWITCH HELIX API ──────────────────────────────────────────────────────
-
-async function getTwitchToken(): Promise<string | null> {
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  try {
-    const res = await axios.post(
-      `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`
-    );
-    return res.data.access_token;
-  } catch {
-    return null;
+  // Read bots: BOT1_USERNAME + BOT1_OAUTH_TOKEN, BOT2_, BOT3_ ...
+  const bots: { username: string; token: string }[] = [];
+  for (let i = 1; i <= 50; i++) {
+    const u = process.env[`BOT${i}_USERNAME`]?.trim();
+    const t = process.env[`BOT${i}_OAUTH_TOKEN`]?.trim();
+    if (u && t) bots.push({ username: u, token: t });
   }
+
+  return { channel, groqKey, language, interval, context, bots };
 }
 
-async function getStreamInfo(channel: string, socket: any): Promise<void> {
-  if (!twitchAccessToken) {
-    twitchAccessToken = await getTwitchToken();
-    if (!twitchAccessToken) return;
-  }
+// ── TWITCH API ───────────────────────────────────────────────────────────────
+let twitchToken: string | null = null;
 
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  if (!clientId) return;
+async function fetchTwitchToken(): Promise<string | null> {
+  const cid = process.env.TWITCH_CLIENT_ID;
+  const cs = process.env.TWITCH_CLIENT_SECRET;
+  if (!cid || !cs) return null;
+  try {
+    const r = await axios.post(
+      `https://id.twitch.tv/oauth2/token?client_id=${cid}&client_secret=${cs}&grant_type=client_credentials`
+    );
+    return r.data.access_token as string;
+  } catch { return null; }
+}
+
+async function pollStreamInfo(channel: string, emit: (e: string, d: unknown) => void): Promise<void> {
+  const cid = process.env.TWITCH_CLIENT_ID;
+  if (!cid || !channel) return;
+  if (!twitchToken) twitchToken = await fetchTwitchToken();
+  if (!twitchToken) return;
 
   try {
-    const res = await axios.get(
-      `https://api.twitch.tv/helix/streams?user_login=${channel}`,
-      {
-        headers: {
-          'Client-ID': clientId,
-          Authorization: `Bearer ${twitchAccessToken}`,
-        },
-      }
-    );
-
-    const stream = res.data.data?.[0];
-    if (stream) {
-      const thumbnail = stream.thumbnail_url
-        .replace('{width}', '320')
-        .replace('{height}', '180');
-
-      socket.emit('stream:info', {
-        live: true,
-        title: stream.title,
-        meta: `${stream.game_name} · ${stream.viewer_count.toLocaleString()} зрителей`,
-        thumbnail,
-      });
-
-      socket.emit('stream:viewers', { viewers: stream.viewer_count });
+    const r = await axios.get(`https://api.twitch.tv/helix/streams?user_login=${channel}`, {
+      headers: { 'Client-ID': cid, Authorization: `Bearer ${twitchToken}` },
+    });
+    const s = r.data.data?.[0];
+    if (s) {
+      emit('stream:viewers', { viewers: s.viewer_count });
+      emit('stream:info', { live: true, game: s.game_name, viewers: s.viewer_count });
     } else {
-      socket.emit('stream:info', {
-        live: false,
-        title: channel,
-        meta: 'Стрим не идёт',
-      });
+      emit('stream:info', { live: false });
     }
-  } catch (err: any) {
-    if (err.response?.status === 401) {
-      // Token expired, refresh
-      twitchAccessToken = await getTwitchToken();
-    }
+  } catch (e: any) {
+    if (e.response?.status === 401) twitchToken = null;
   }
 }
 
-// ─── SOCKET.IO ─────────────────────────────────────────────────────────────
+// ── SOCKET.IO ────────────────────────────────────────────────────────────────
+let manager: BotManager | null = null;
+let streamPoll: NodeJS.Timeout | null = null;
 
-io.on('connection', (socket) => {
-  console.log(`[Server] Client connected: ${socket.id}`);
+io.on('connection', socket => {
+  console.log('[server] client connected', socket.id);
 
-  socket.on('bots:start', async (data) => {
-    try {
-      if (botManager) {
-        await botManager.stop();
-        botManager = null;
-      }
-
-      const { channel, groqKey, interval, lang, context, bots, settings } = data;
-
-      if (!channel || !groqKey || !bots?.length) {
-        socket.emit('error', { message: 'Не все поля заполнены' });
-        return;
-      }
-
-      // Create bot manager
-      botManager = new BotManager(
-        bots,
-        channel,
-        groqKey,
-        {
-          messageInterval: Math.max(10, interval || 30),
-          language: lang || 'ru',
-          streamContext: context || '',
-          aiSettings: settings || {},
-        },
-        (event, eventData) => {
-          socket.emit(event, eventData);
-        }
-      );
-
-      await botManager.start();
-
-      socket.emit('bots:started', { bots: bots.map((b: any) => b.username) });
-
-      // Start polling stream info
-      if (streamInfoInterval) clearInterval(streamInfoInterval);
-      await getStreamInfo(channel, socket);
-      streamInfoInterval = setInterval(() => getStreamInfo(channel, socket), 30000);
-
-    } catch (err: any) {
-      console.error('[Server] Error starting bots:', err);
-      socket.emit('error', { message: err.message || 'Ошибка запуска' });
-    }
+  // Send config to frontend
+  socket.on('get:config', () => {
+    const cfg = readConfig();
+    socket.emit('config', { channel: cfg.channel });
   });
 
-  socket.on('bots:stop', async () => {
-    try {
-      if (streamInfoInterval) {
-        clearInterval(streamInfoInterval);
-        streamInfoInterval = null;
-      }
-      if (botManager) {
-        await botManager.stop();
-        botManager = null;
-      }
-      socket.emit('bots:stopped');
-    } catch (err: any) {
-      socket.emit('error', { message: err.message });
+  // Manual message from operator
+  socket.on('send:manual', async (data: { targets: string[]; message: string }) => {
+    if (manager && data.targets?.length && data.message) {
+      await manager.sendManual(data.targets, data.message);
     }
   });
 
   socket.on('disconnect', () => {
-    console.log(`[Server] Client disconnected: ${socket.id}`);
+    console.log('[server] client disconnected', socket.id);
   });
 });
 
-// Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// ── AUTO-START BOTS FROM ENV ─────────────────────────────────────────────────
+async function autoStart(): Promise<void> {
+  const cfg = readConfig();
 
-httpServer.listen(PORT, () => {
-  console.log(`\n🚀 TwitchAI Boost running at http://localhost:${PORT}\n`);
+  if (!cfg.channel) { console.warn('[server] TWITCH_CHANNEL not set'); return; }
+  if (!cfg.groqKey) { console.warn('[server] GROQ_API_KEY not set'); return; }
+  if (!cfg.bots.length) { console.warn('[server] No bots configured (BOT1_USERNAME / BOT1_OAUTH_TOKEN)'); return; }
+
+  console.log(`[server] Auto-starting ${cfg.bots.length} bots for #${cfg.channel}`);
+
+  manager = new BotManager(
+    cfg.bots,
+    cfg.channel,
+    cfg.groqKey,
+    {
+      interval: cfg.interval,
+      language: cfg.language,
+      context: cfg.context,
+      settings: { useEmoji: true, chatContext: true, uniquePersonas: true },
+    },
+    (event, data) => io.emit(event, data)
+  );
+
+  manager.start();
+
+  // Notify frontend
+  io.emit('bots:started', { bots: cfg.bots.map(b => b.username) });
+
+  // Poll stream info every 30s
+  await pollStreamInfo(cfg.channel, (e, d) => io.emit(e, d));
+  streamPoll = setInterval(() => pollStreamInfo(cfg.channel, (e, d) => io.emit(e, d)), 30000);
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+http.listen(PORT, async () => {
+  console.log(`\n🚀 TwitchBoost running at http://localhost:${PORT}\n`);
+  // Wait a moment for socket connections then auto-start
+  setTimeout(autoStart, 2000);
 });
 
 process.on('SIGTERM', async () => {
-  if (botManager) await botManager.stop();
+  if (streamPoll) clearInterval(streamPoll);
+  if (manager) await manager.stop();
   process.exit(0);
 });

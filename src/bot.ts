@@ -10,222 +10,136 @@ interface BotInstance {
   client: tmi.Client;
   username: string;
   connected: boolean;
-  reconnectAttempts: number;
-  messagesSent: number;
-  messageTimer?: NodeJS.Timeout;
+  timer?: NodeJS.Timeout;
+  messages: number;
 }
 
+type EmitFn = (event: string, data: unknown) => void;
+
 export class BotManager {
-  private bots: Map<string, BotInstance> = new Map();
+  private bots = new Map<string, BotInstance>();
   private ai: AIService;
   private channel: string;
-  private messageInterval: number;
-  private streamContext: string;
+  private intervalMs: number;
+  private context: string;
   private language: string;
-  private emit: (event: string, data: any) => void;
-  private globalInterval?: NodeJS.Timeout;
+  private emit: EmitFn;
   private stopped = false;
 
   constructor(
     configs: BotConfig[],
     channel: string,
     groqKey: string,
-    settings: {
-      messageInterval: number;
-      language: string;
-      streamContext: string;
-      aiSettings: any;
-    },
-    emitFn: (event: string, data: any) => void
+    opts: { interval: number; language: string; context: string; settings: Record<string, boolean> },
+    emit: EmitFn
   ) {
-    this.channel = channel.toLowerCase().replace('#', '');
-    this.messageInterval = settings.messageInterval * 1000;
-    this.streamContext = settings.streamContext;
-    this.language = settings.language;
-    this.emit = emitFn;
-    this.ai = new AIService(groqKey, settings.aiSettings);
+    this.channel = channel.toLowerCase().replace(/^#/, '');
+    this.intervalMs = Math.max(10, opts.interval) * 1000;
+    this.context = opts.context;
+    this.language = opts.language;
+    this.emit = emit;
+    this.ai = new AIService(groqKey, opts.settings);
 
-    configs.forEach(cfg => this.createBot(cfg));
+    configs.forEach((cfg, idx) => this.initBot(cfg, idx));
   }
 
-  private createBot(cfg: BotConfig): void {
-    const token = cfg.token.startsWith('oauth:') ? cfg.token : `oauth:${cfg.token}`;
+  private initBot(cfg: BotConfig, idx: number): void {
+    const token = cfg.token.startsWith('oauth:') ? cfg.token : 'oauth:' + cfg.token;
 
     const client = new tmi.Client({
       options: { debug: false, skipMembership: true },
-      identity: {
-        username: cfg.username,
-        password: token,
-      },
-      channels: [`#${this.channel}`],
-      connection: {
-        reconnect: true,
-        maxReconnectAttempts: 10,
-        reconnectDecay: 1.5,
-        reconnectInterval: 2000,
-        secure: true,
-      },
+      identity: { username: cfg.username, password: token },
+      channels: ['#' + this.channel],
+      connection: { reconnect: true, maxReconnectAttempts: 20, reconnectInterval: 3000, secure: true },
     });
 
-    const instance: BotInstance = {
-      client,
-      username: cfg.username,
-      connected: false,
-      reconnectAttempts: 0,
-      messagesSent: 0,
-    };
+    const bot: BotInstance = { client, username: cfg.username, connected: false, messages: 0 };
+    this.bots.set(cfg.username, bot);
 
-    this.bots.set(cfg.username, instance);
-
-    // Events
     client.on('connected', () => {
-      instance.connected = true;
-      instance.reconnectAttempts = 0;
-      this.emit('bot:status', {
-        username: cfg.username,
-        state: 'connected',
-        message: `Подключён к #${this.channel}`,
-      });
+      bot.connected = true;
+      this.emit('bot:status', { username: cfg.username, state: 'connected', message: 'Подключён' });
     });
-
-    client.on('disconnected', (reason) => {
-      instance.connected = false;
-      if (!this.stopped) {
-        this.emit('bot:status', {
-          username: cfg.username,
-          state: 'reconnecting',
-          message: `Переподключение... (${reason})`,
-        });
-      }
+    client.on('disconnected', (reason: string) => {
+      bot.connected = false;
+      if (!this.stopped)
+        this.emit('bot:status', { username: cfg.username, state: 'reconnecting', message: reason });
     });
-
     client.on('reconnect', () => {
-      instance.reconnectAttempts++;
-      this.emit('bot:status', {
-        username: cfg.username,
-        state: 'connecting',
-        message: `Попытка ${instance.reconnectAttempts}...`,
-      });
+      this.emit('bot:status', { username: cfg.username, state: 'connecting', message: 'Переподключение...' });
     });
-
-    // Read chat for AI context
-    client.on('message', (_channel, tags, message, self) => {
-      if (!self && tags.username !== cfg.username) {
-        this.ai.addChatContext(`${tags.username}: ${message}`);
-      }
+    client.on('message', (_ch: string, tags: tmi.CommonUserstate, message: string, self: boolean) => {
+      if (!self) this.ai.addChatContext((tags.username || '') + ': ' + message);
     });
 
     this.emit('bot:status', { username: cfg.username, state: 'connecting', message: 'Подключение...' });
+
+    // Stagger connection
+    setTimeout(() => {
+      if (!this.stopped)
+        client.connect().catch((e: Error) =>
+          this.emit('bot:status', { username: cfg.username, state: 'error', message: e.message })
+        );
+    }, idx * 1500);
   }
 
-  async start(): Promise<void> {
+  start(): void {
     this.stopped = false;
-
-    // Connect all bots (staggered to avoid rate limits)
-    const connectPromises = Array.from(this.bots.values()).map((bot, idx) =>
-      new Promise<void>(resolve => {
-        setTimeout(async () => {
-          try {
-            await bot.client.connect();
-          } catch (err: any) {
-            this.emit('bot:status', {
-              username: bot.username,
-              state: 'error',
-              message: err.message || 'Ошибка подключения',
-            });
-          }
-          resolve();
-        }, idx * 1500); // 1.5s between each bot
-      })
-    );
-
-    await Promise.allSettled(connectPromises);
-
-    // Start message scheduler - stagger bots so they don't all post at once
-    this.startMessageScheduler();
-  }
-
-  private startMessageScheduler(): void {
     const bots = Array.from(this.bots.values());
-    if (bots.length === 0) return;
 
-    // Each bot sends on a staggered schedule
+    // Stagger first messages then schedule individually
     bots.forEach((bot, idx) => {
-      const offset = Math.floor((this.messageInterval / bots.length) * idx);
-      
-      bot.messageTimer = setTimeout(async () => {
-        if (!this.stopped) {
-          await this.sendBotMessage(bot);
-          this.scheduleBotNext(bot);
-        }
-      }, offset + 3000); // Wait 3s after start for connections to establish
+      const delay = 5000 + (this.intervalMs / bots.length) * idx;
+      bot.timer = setTimeout(() => this.scheduleBot(bot), delay);
     });
   }
 
-  private scheduleBotNext(bot: BotInstance): void {
+  private scheduleBot(bot: BotInstance): void {
     if (this.stopped) return;
-
-    // Random jitter ±20% of interval to feel more human
-    const jitter = (Math.random() * 0.4 - 0.2) * this.messageInterval;
-    const delay = Math.max(8000, this.messageInterval + jitter);
-
-    bot.messageTimer = setTimeout(async () => {
+    this.sendMsg(bot).then(() => {
       if (!this.stopped) {
-        await this.sendBotMessage(bot);
-        this.scheduleBotNext(bot);
+        const jitter = (Math.random() * 0.4 - 0.2) * this.intervalMs;
+        bot.timer = setTimeout(() => this.scheduleBot(bot), Math.max(8000, this.intervalMs + jitter));
       }
-    }, delay);
+    });
   }
 
-  private async sendBotMessage(bot: BotInstance): Promise<void> {
+  private async sendMsg(bot: BotInstance): Promise<void> {
     if (!bot.connected || this.stopped) return;
-
     try {
-      const message = await this.ai.generateMessage(
-        bot.username,
-        this.streamContext,
-        this.language
-      );
+      const msg = await this.ai.generateMessage(bot.username, this.context, this.language);
+      if (!msg) return;
+      await bot.client.say('#' + this.channel, msg);
+      bot.messages++;
+      this.emit('bot:message', { username: bot.username, message: msg, count: bot.messages });
+    } catch (e: any) {
+      if (!e.message?.includes('Not connected'))
+        this.emit('bot:status', { username: bot.username, state: 'error', message: e.message });
+    }
+  }
 
-      if (!message) return;
-
-      await bot.client.say(`#${this.channel}`, message);
-      bot.messagesSent++;
-
-      this.emit('bot:message', {
-        username: bot.username,
-        message,
-        count: bot.messagesSent,
-      });
-    } catch (err: any) {
-      // Ignore "Not connected" errors during reconnection
-      if (!err.message?.includes('Not connected')) {
-        this.emit('bot:status', {
-          username: bot.username,
-          state: 'error',
-          message: err.message,
-        });
+  async sendManual(usernames: string[], message: string): Promise<void> {
+    for (const u of usernames) {
+      const bot = this.bots.get(u);
+      if (!bot?.connected) continue;
+      try {
+        await bot.client.say('#' + this.channel, message);
+        bot.messages++;
+        this.emit('bot:message', { username: u, message, count: bot.messages });
+      } catch (e: any) {
+        this.emit('bot:status', { username: u, state: 'error', message: e.message });
       }
     }
   }
 
   async stop(): Promise<void> {
     this.stopped = true;
-
-    // Clear all timers
-    this.bots.forEach(bot => {
-      if (bot.messageTimer) clearTimeout(bot.messageTimer);
-    });
-
-    // Disconnect all
-    const disconnects = Array.from(this.bots.values()).map(bot =>
-      bot.client.disconnect().catch(() => {})
-    );
-    await Promise.allSettled(disconnects);
+    this.bots.forEach(bot => { if (bot.timer) clearTimeout(bot.timer); });
+    await Promise.allSettled(Array.from(this.bots.values()).map(b => b.client.disconnect().catch(() => {})));
     this.bots.clear();
   }
 
-  getBotUsernames(): string[] {
+  getUsernames(): string[] {
     return Array.from(this.bots.keys());
   }
 }

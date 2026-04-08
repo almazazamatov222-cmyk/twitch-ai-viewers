@@ -1,180 +1,103 @@
 import Groq from 'groq-sdk';
 
-interface BotPersona {
-  name: string;
-  style: string;
-  traits: string[];
-  chatHistory: { role: 'user' | 'assistant'; content: string }[];
-}
-
 const PERSONAS = [
-  {
-    style: 'enthusiastic fan',
-    traits: ['Very hyped', 'Uses lots of exclamations', 'Loves the streamer', 'Short excited messages'],
-  },
-  {
-    style: 'chill lurker',
-    traits: ['Relaxed', 'Occasional short comments', 'Uses "lol" and "lmao"', 'Laid back vibe'],
-  },
-  {
-    style: 'helpful viewer',
-    traits: ['Gives tips and advice', 'Asks strategic questions', 'Knows the game well', 'Constructive'],
-  },
-  {
-    style: 'funny troll (friendly)',
-    traits: ['Makes jokes', 'Light-hearted trolling', 'Puns and wordplay', 'Never mean'],
-  },
-  {
-    style: 'newbie curious',
-    traits: ['Asks questions about the game', 'Learning', 'Impressed by things', 'Innocent reactions'],
-  },
-  {
-    style: 'veteran gamer',
-    traits: ['References old games', 'Technical knowledge', 'Nostalgic', 'Matter-of-fact comments'],
-  },
-  {
-    style: 'hype man',
-    traits: ['PogChamp energy', 'Hypes up plays', 'CAPS sometimes', 'Very reactive'],
-  },
-  {
-    style: 'calm analyst',
-    traits: ['Strategic observations', 'Thoughtful', 'Brief insights', 'Respectful'],
-  },
+  { style: 'enthusiastic fan', traits: 'Very hyped, short excited messages, uses exclamations' },
+  { style: 'chill viewer', traits: 'Relaxed, casual, uses lol/lmao, laid back' },
+  { style: 'helpful viewer', traits: 'Gives tips, asks strategic questions, knowledgeable' },
+  { style: 'funny troll', traits: 'Makes jokes, light-hearted, puns, never mean' },
+  { style: 'newbie', traits: 'Asks questions, curious, impressed, innocent reactions' },
+  { style: 'veteran gamer', traits: 'References old games, technical, nostalgic' },
+  { style: 'hype man', traits: 'PogChamp energy, hypes up plays, reactive' },
+  { style: 'analyst', traits: 'Strategic observations, thoughtful, brief insights' },
 ];
 
-const EMOJI_SETS = {
-  hype: ['PogChamp', 'POGGERS', 'Pog', '🔥', '💯', 'LUL', '😂', '😮', 'OMEGALUL', 'PauseChamp'],
-  positive: ['✨', '👍', '💪', '🎮', '🏆', '❤️', 'Clap', 'GG', 'NotLikeThis'],
-  neutral: ['👀', '🤔', 'Hmm', 'monkaS', 'KEKW', '😅', '😭', 'copium'],
-};
+interface ChatHistory {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 export class AIService {
   private groq: Groq;
-  private botPersonas: Map<string, BotPersona> = new Map();
-  private settings: any;
-  private recentMessages: string[] = [];
+  private personas = new Map<string, (typeof PERSONAS)[0]>();
+  private histories = new Map<string, ChatHistory[]>();
+  private recentChat: string[] = [];
+  private settings: Record<string, boolean>;
 
-  constructor(apiKey: string, settings: any = {}) {
+  constructor(apiKey: string, settings: Record<string, boolean> = {}) {
     this.groq = new Groq({ apiKey });
     this.settings = settings;
   }
 
-  assignPersona(username: string): void {
-    if (this.botPersonas.has(username)) return;
-    const idx = this.botPersonas.size % PERSONAS.length;
-    const persona = PERSONAS[idx];
-    this.botPersonas.set(username, {
-      name: username,
-      style: persona.style,
-      traits: persona.traits,
-      chatHistory: [],
-    });
+  addChatContext(line: string): void {
+    this.recentChat.push(line);
+    if (this.recentChat.length > 15) this.recentChat.shift();
   }
 
-  addChatContext(message: string): void {
-    this.recentMessages.push(message);
-    if (this.recentMessages.length > 20) this.recentMessages.shift();
+  private getPersona(username: string) {
+    if (!this.personas.has(username)) {
+      const idx = this.personas.size % PERSONAS.length;
+      this.personas.set(username, PERSONAS[idx]);
+    }
+    return this.personas.get(username)!;
   }
 
   async generateMessage(
     username: string,
-    streamContext: string,
-    language: string,
-    transcript?: string
+    context: string,
+    language: string
   ): Promise<string> {
-    this.assignPersona(username);
-    const persona = this.botPersonas.get(username)!;
-
+    const persona = this.getPersona(username);
     const langName = language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English';
-    const emojiInstruction = this.settings.useEmoji
-      ? 'You may occasionally use Twitch emotes like LUL, PogChamp, Kappa, KEKW, or relevant emojis.'
-      : 'Do not use emojis or emotes.';
-
-    const chatCtx = this.settings.chatContext && this.recentMessages.length > 0
-      ? `\nRecent chat messages:\n${this.recentMessages.slice(-5).join('\n')}\n`
+    const emojiHint = this.settings.useEmoji
+      ? 'May use Twitch emotes like LUL, Pog, KEKW, or relevant emojis occasionally.'
+      : 'Do not use emojis.';
+    const chatCtx = this.settings.chatContext && this.recentChat.length
+      ? '\nRecent chat:\n' + this.recentChat.slice(-5).join('\n')
       : '';
 
-    const transcriptCtx = transcript
-      ? `\nStreamer just said: "${transcript}"\n`
-      : '';
+    const system = `You are a Twitch viewer "${username}" watching a live stream.
+Personality: ${persona.style}. Traits: ${persona.traits}.
+Language: ${langName}. Be SHORT (5-20 words max). Natural and varied.
+${emojiHint}
+Stream context: ${context || 'Gaming stream'}${chatCtx}
+Generate ONE unique chat message. Output ONLY the message, nothing else.`;
 
-    const systemPrompt = this.settings.uniquePersonas
-      ? `You are a Twitch viewer named "${username}" watching a live stream.
-Your personality: ${persona.style}
-Your traits: ${persona.traits.join(', ')}
-You write in ${langName}.
-Keep messages SHORT (5-25 words maximum). Be natural and conversational.
-Never repeat yourself. Never say generic things like "nice stream" every time.
-${emojiInstruction}
-Stream context: ${streamContext || 'Gaming stream'}
-${chatCtx}${transcriptCtx}
-Generate ONE unique chat message that fits your personality. Just the message, nothing else.`
-      : `You are a Twitch chat viewer named "${username}".
-You write in ${langName}.
-Keep messages SHORT (5-25 words). Be natural, varied, and engaging.
-${emojiInstruction}
-Stream context: ${streamContext || 'Gaming stream'}
-${chatCtx}${transcriptCtx}
-Generate ONE unique chat message. Just the message, nothing else.`;
-
-    // Use chat history for continuity
-    const messages = [
-      ...persona.chatHistory.slice(-6),
-      {
-        role: 'user' as const,
-        content: 'Generate a chat message now.',
-      },
-    ];
+    const history = this.histories.get(username) || [];
 
     try {
-      const response = await this.groq.chat.completions.create({
+      const res = await this.groq.chat.completions.create({
         model: 'llama-3.1-8b-instant',
-        max_tokens: 80,
-        temperature: 0.9,
-        top_p: 0.95,
-        frequency_penalty: 0.8,
+        max_tokens: 60,
+        temperature: 0.92,
+        frequency_penalty: 0.85,
         presence_penalty: 0.6,
         messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
+          { role: 'system', content: system },
+          ...history.slice(-8),
+          { role: 'user', content: 'Send a chat message now.' },
         ],
       });
 
-      const msg = response.choices[0]?.message?.content?.trim() || '';
-
+      const msg = res.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, '') || '';
+      
       // Update history
-      persona.chatHistory.push(
-        { role: 'user', content: 'Generate a chat message now.' },
-        { role: 'assistant', content: msg }
-      );
-      if (persona.chatHistory.length > 12) {
-        persona.chatHistory = persona.chatHistory.slice(-12);
-      }
+      const newHistory: ChatHistory[] = [
+        ...history,
+        { role: 'user', content: 'Send a chat message now.' },
+        { role: 'assistant', content: msg },
+      ].slice(-10);
+      this.histories.set(username, newHistory);
 
-      return this.sanitizeMessage(msg);
+      return msg.slice(0, 200);
     } catch (err: any) {
-      console.error(`[AI] Error for ${username}:`, err.message);
-      return this.fallbackMessage(language, persona.style);
+      console.error(`[AI] ${username}: ${err.message}`);
+      const fallbacks: Record<string, string[]> = {
+        ru: ['nice!', 'gg!', 'давай!', 'лол', '😮', 'хорошо сыграно'],
+        en: ['nice!', 'gg!', 'let\'s go!', 'lol', 'PogChamp'],
+        kk: ['жарайсың!', 'gg!', 'алға!'],
+      };
+      const arr = fallbacks[language] || fallbacks.en;
+      return arr[Math.floor(Math.random() * arr.length)];
     }
-  }
-
-  private sanitizeMessage(msg: string): string {
-    // Remove quotes if wrapped
-    return msg.replace(/^["']|["']$/g, '').trim().slice(0, 200);
-  }
-
-  private fallbackMessage(language: string, style: string): string {
-    const fallbacks: Record<string, string[]> = {
-      ru: ['это было круто!', 'gg!', 'давай давай!', 'чат, вы видели это?', '😮 вот это да', 'лол', 'удачи!'],
-      en: ['let\'s go!', 'nice one!', 'gg!', 'hype!', 'lol that was close', 'GG', 'PogChamp'],
-      kk: ['жарайсың!', 'gg!', 'алға!', 'осыны көрдіңдер ме?'],
-    };
-    const arr = fallbacks[language] || fallbacks.en;
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
-  clearHistory(username: string): void {
-    const persona = this.botPersonas.get(username);
-    if (persona) persona.chatHistory = [];
   }
 }
