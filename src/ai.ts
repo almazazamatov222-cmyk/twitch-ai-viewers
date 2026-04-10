@@ -137,7 +137,8 @@ export class AIService {
         ],
       });
       const raw = (res.choices[0]?.message?.content || '').trim()
-        .replace(/^["'`*_]+|["'`*_]+$/g, '').replace(/^\w+:\s*/, '').trim();
+        .replace(/^["'`*_]+|["'`*_]+$/g, '').replace(/^\w+:\s*/, '').trim()
+        .replace(/[\p{Emoji}]/gu, '').replace(/\s+/g, ' ').trim();
       if (!raw || raw.length < 2) return '';
       const updated: Msg[] = [...history,
         { role: 'user' as const, content: userPrompt },
