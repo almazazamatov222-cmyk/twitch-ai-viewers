@@ -82,12 +82,12 @@ export class AIService {
     for (const [k, v] of this.histories) {
       histories[k] = v.map(m => ({ role: m.role, content: m.content, time: Date.now() }));
     }
-    const transcripts = this.transcriptLog.slice(-100).map(t => ({
+    const transcripts = this.transcriptLog.slice(-1000).map(t => ({
       heard: t.heard,
       timestamp: t.timestamp,
       responses: [{ username: t.username, message: t.message }]
     }));
-    const realChat = this.realChatSamples.slice(-50).map(c => {
+    const realChat = this.realChatSamples.slice(-500).map(c => {
       const idx = c.indexOf(': ');
       return { username: c.slice(0, idx), message: c.slice(idx + 2), time: Date.now() };
     });
@@ -95,7 +95,7 @@ export class AIService {
   }
   addRealMessage(displayName: string, message: string): void {
     this.realChatSamples.push(displayName + ': ' + message);
-    if (this.realChatSamples.length > 30) this.realChatSamples.shift();
+    if (this.realChatSamples.length > 500) this.realChatSamples.shift();
   }
 
   async generateFromTranscription(
@@ -161,7 +161,7 @@ export class AIService {
         persona: custom ? custom.role : 'default_' + botIndex,
         timestamp: Date.now(),
       });
-      if (this.transcriptLog.length > 300) this.transcriptLog.shift();
+      if (this.transcriptLog.length > 2000) this.transcriptLog.shift();
       return raw.slice(0, 200);
     } catch (e: any) {
       console.error('[ai] error for', username, ':', e.message);

@@ -170,6 +170,7 @@ io.on('connection', socket => {
   socket.on('set:persona', (data: { username: string; role: string; sys: string }) => {
     const k = data.username.toLowerCase(), cfg2: PersonaConfig = { role: data.role, sys: data.sys };
     saved.personas[k] = cfg2; saveToDisk(saved, currentChannel);
+    console.log('[persona] Saved for:', k);
     if (manager) manager.setPersona(data.username, cfg2);
     io.emit('personas:update', saved.personas);
     socket.emit('persona:saved', { username: data.username, ok: true });
@@ -267,17 +268,18 @@ async function autoStart(): Promise<void> {
     if ((si as any).viewers != null) io.emit('stream:viewers', { viewers: (si as any).viewers });
   }, 30000);
 
-  // Save history every 2 minutes
+  // Save history every 10 minutes - save EVERYTHING
   const historySaveInterval = setInterval(() => {
     if (manager) {
       const hist = manager.getHistoryForSave();
       saved.botHistories = hist.histories;
       saved.transcriptHistory = hist.transcripts;
       saved.realChatHistory = hist.realChat;
-      console.log('[history] Saving, bots:', Object.keys(hist.histories).length, 'transcripts:', hist.transcripts.length);
+      console.log('[history] FULL SAVE, bots:', Object.keys(hist.histories).length, 'transcripts:', hist.transcripts.length, 'chat:', hist.realChat.length);
     }
     saveToDisk(saved, currentChannel);
-  }, 120000);
+    console.log('[history] Saved to disk');
+  }, 600000);
 }
 
 http.listen(PORT, () => {
