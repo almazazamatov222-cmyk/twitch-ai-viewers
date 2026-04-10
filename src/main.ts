@@ -83,7 +83,7 @@ async function getAppToken(): Promise<string | null> {
   try {
     const r = await axios.post('https://id.twitch.tv/oauth2/token?' + 
       new URLSearchParams({ client_id: cid, client_secret: cs, grant_type: 'client_credentials' }).toString());
-    console.log('[helix] token response:', r.data);
+    console.log('[helix] token response: ok, expires:', r.data.expires_in);
     return r.data.access_token as string;
   } catch (e: any) { 
     console.error('[helix] token error:', e.message);
