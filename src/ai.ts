@@ -18,9 +18,33 @@ interface Msg { role: 'user' | 'assistant'; content: string; }
 const BUILTIN: Record<string, PersonaConfig> = {
   'olegzhoskii': {
     role: 'ukrainian_teen',
-    sys: `Ти — 15-річний українець-школяр, фанат стримера. ТІЛЬКИ українська мова.
-Стиль: "бро", "топ", "лол", "кайф", "gg", помилки як школяр. Макс 8 слів.
-Реагуй на те що сказав стример.`,
+    sys: `Ти 15-річний українець. Без крапок і ком. Тільки українська.
+Пиши коротко 3-6 слів. Емоції: лол, ахах, топ, бро, кейси.
+Не описуй що робить стример. Просто реагуй.`,
+  },
+  'chill_dude': {
+    role: 'chill',
+    sys: `Ти звичайний чувак у чаті. Без крапок.
+Пиши як в чаті 3-5 слів. Лол, ахах, ок, да.
+Просто емоція на те що чуєш.`,
+  },
+  'hype_guy': {
+    role: 'hype',
+    sys: `Ти фанат який хайпає. Без крапок.
+Пиши коротко 2-4 слова. ЄЄЄ, ГОЄ, ЛЕТС ГО, топ.
+Емоційна підтримка.`,
+  },
+  'silent_obs': {
+    role: 'observer',
+    sys: `Ти тихий чувак який спостерігає. Майже не пиши.
+1-3 слова максимум. Лол, ахах, ок.
+Короткі реакції.`,
+  },
+  'ru_chat': {
+    role: 'ru viewer',
+    sys: `Ти звичайний російський глядач. Без знаків.
+Пиши як в чаті твіча 2-5 слів. Лол, ахах, да, ок.
+Просто реакція`,
   },
 };
 
@@ -117,18 +141,16 @@ export class AIService {
     let userPrompt: string;
 
     if (taggedMessage) {
-      system = custom ? custom.sys + '\nOutput ONLY the reply. Max 8 words.' :
+      system = custom ? custom.sys + '\nБез крапок. 2-5 слів.' :
         `You are a Twitch viewer. Write in ${lang}. 1-2 sentences max.`;
       userPrompt = `Reply to: "${taggedMessage}"`;
     } else {
       system = [
-        custom ? custom.sys : `You are "${username}", a real Twitch chat viewer. Write in ${lang} only.`,
-        `The streamer just said (heard via audio): "${transcribedText}"`,
-        chatCtx,
-        'Write ONE short chat reaction to what the streamer said.',
-        'Must be directly about what was transcribed.',
-        'Match style and length of real viewer messages above.',
-        'Output ONLY the chat message. Max 5-8 words. Short casual comment.',
+        custom ? custom.sys : `Ти звичайний глядач. Без крапок і знаків. 2-5 слів.
+Пиши як в чаті твіча: лол, ахах, топ, да, ок.
+ ${lang !== 'ru' && lang !== 'uk' ? 'English only.' : ''}`,
+        `Що сказав стример: "${transcribedText}"` + (chatCtx ? '\n' + chatCtx : ''),
+        'Коротка реакція. Без крапок. 2-5 слів.',
       ].filter(Boolean).join('\n');
       userPrompt = 'React to what the streamer just said.';
     }
@@ -137,10 +159,10 @@ export class AIService {
     try {
       const res = await this.groq.chat.completions.create({
         model: 'llama-3.1-8b-instant',
-        max_tokens: 50,
+        max_tokens: 30,
         temperature: 0.7,
-        frequency_penalty: 1.0,
-        presence_penalty: 0.5,
+        frequency_penalty: 1.5,
+        presence_penalty: 1.0,
         messages: [
           { role: 'system', content: system },
           ...history.slice(-4),
