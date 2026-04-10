@@ -110,14 +110,14 @@ export class AIService {
     let userPrompt: string;
 
     if (taggedMessage) {
-      system = custom ? custom.sys + '\nShort reply. No dots.' :
+      system = custom ? custom.sys + '\nShort reply. NO EMOJI.' :
         `You are a Twitch viewer. Write in ${lang}. 1-2 sentences max.`;
       userPrompt = `Reply to: "${taggedMessage}"`;
     } else {
       system = [
         custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. Short reactions.`,
         `The streamer said: "${transcribedText}"` + (chatCtx ? '\n' + chatCtx : ''),
-        'Short response. 2-5 words. Like chat emoji.',
+        'Short response. 1-3 words. NO EMOJI.',
       ].filter(Boolean).join('\n');
       userPrompt = 'React to what the streamer just said.';
     }
