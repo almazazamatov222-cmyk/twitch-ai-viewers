@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_20", "python311", "ffmpeg", "python311Packages.pip"]
 
 [phases.install]
-cmds = ["pip install streamlink", "npm install --omit=dev"]
+cmds = ["pip install streamlink --break-system-packages", "npm install --omit=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
