@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import axios from 'axios';
 import { BotManager } from './bot';
 import { PersonaConfig } from './ai';
+import { TranscriptionService } from './transcription';
 
 const app = express();
 const http = createServer(app);
@@ -17,49 +18,32 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 3000;
 
-// ── Persistent storage ─────────────────────────────────────────────────────
-// Railway mounts a volume; find a writable path
+// ── Persistent storage ──────────────────────────────────────────────────────
 function getDataDir(): string {
-  const candidates = [
-    '/var/lib/twitch-boost',
-    '/app/data',
-    '/tmp/twitch-boost',
-    path.join(__dirname, '../data'),
-  ];
-  for (const d of candidates) {
+  for (const d of ['/var/lib/twitch-boost', '/app/data', '/tmp/twitch-boost', path.join(__dirname, '../data')]) {
     try { fs.mkdirSync(d, { recursive: true }); return d; } catch { /* try next */ }
   }
   return '/tmp';
 }
-
 const DATA_DIR = getDataDir();
 const CONFIG_FILE = path.join(DATA_DIR, 'saved-config.json');
+console.log('[config] data dir:', DATA_DIR);
 
 interface SavedConfig {
   personas: Record<string, PersonaConfig>;
   phraseGroups: Record<string, string[]>;
-  interval?: number;
+  botsPerTranscript?: number;
 }
 
 function loadSaved(): SavedConfig {
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
-      return JSON.parse(raw);
-    }
-  } catch (e: any) {
-    console.warn('[config] load error:', e.message);
-  }
+    if (fs.existsSync(CONFIG_FILE)) return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+  } catch (e: any) { console.warn('[config] load error:', e.message); }
   return { personas: {}, phraseGroups: {} };
 }
-
 function saveToDisk(data: SavedConfig): void {
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    console.log('[config] saved to', CONFIG_FILE);
-  } catch (e: any) {
-    console.error('[config] save error:', e.message);
-  }
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2)); console.log('[config] saved'); }
+  catch (e: any) { console.error('[config] save error:', e.message); }
 }
 
 // ── Env config ──────────────────────────────────────────────────────────────
@@ -74,8 +58,6 @@ function readEnvConfig() {
   const channel = extractChannel(process.env.TWITCH_CHANNEL || '');
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
   const language = (process.env.ORIGINAL_STREAM_LANGUAGE || 'ru').trim();
-  // Raw seconds — NO forced cap, user decides
-  const interval = parseInt(process.env.MESSAGE_INTERVAL || '60');
   const context = (process.env.STREAM_CONTEXT || '').trim();
 
   const bots: { username: string; token: string }[] = [];
@@ -84,34 +66,28 @@ function readEnvConfig() {
     const t = (process.env['BOT' + i + '_OAUTH'] || process.env['BOT' + i + '_OAUTH_TOKEN'])?.trim();
     if (u && t) bots.push({ username: u, token: t });
   }
-  return { channel, groqKey, language, interval, context, bots };
+  return { channel, groqKey, language, context, bots };
 }
 
-// ── Twitch Helix ────────────────────────────────────────────────────────────
+// ── Helix ───────────────────────────────────────────────────────────────────
 let appToken: string | null = null;
-
 async function getAppToken(): Promise<string | null> {
-  const cid = process.env.TWITCH_CLIENT_ID?.trim();
-  const cs  = process.env.TWITCH_CLIENT_SECRET?.trim();
+  const cid = process.env.TWITCH_CLIENT_ID?.trim(), cs = process.env.TWITCH_CLIENT_SECRET?.trim();
   if (!cid || !cs) return null;
   try {
-    const r = await axios.post('https://id.twitch.tv/oauth2/token', null, {
-      params: { client_id: cid, client_secret: cs, grant_type: 'client_credentials' },
-    });
+    const r = await axios.post('https://id.twitch.tv/oauth2/token', null,
+      { params: { client_id: cid, client_secret: cs, grant_type: 'client_credentials' } });
     return r.data.access_token as string;
   } catch { return null; }
 }
-
 async function getStreamData(channel: string) {
   const cid = process.env.TWITCH_CLIENT_ID?.trim();
   if (!cid || !channel) return { live: false };
   if (!appToken) appToken = await getAppToken();
   if (!appToken) return { live: false };
   try {
-    const sRes = await axios.get('https://api.twitch.tv/helix/streams', {
-      params: { user_login: channel },
-      headers: { 'Client-ID': cid, Authorization: 'Bearer ' + appToken },
-    });
+    const sRes = await axios.get('https://api.twitch.tv/helix/streams',
+      { params: { user_login: channel }, headers: { 'Client-ID': cid, Authorization: 'Bearer ' + appToken } });
     const s = sRes.data.data?.[0];
     if (s) return { live: true, viewers: s.viewer_count as number, game: s.game_name as string, title: s.title as string };
     return { live: false };
@@ -123,135 +99,124 @@ async function getStreamData(channel: string) {
 
 // ── State ───────────────────────────────────────────────────────────────────
 let manager: BotManager | null = null;
+let transcriber: TranscriptionService | null = null;
 let streamPoll: NodeJS.Timeout | null = null;
 let startedBots: string[] = [];
 let isStarted = false;
-let currentInterval = 60;
 let saved = loadSaved();
-
-console.log('[config] data dir:', DATA_DIR);
-console.log('[config] loaded personas:', Object.keys(saved.personas).join(', ') || 'none');
-console.log('[config] loaded phrases:', Object.keys(saved.phraseGroups).join(', ') || 'none');
+console.log('[config] personas:', Object.keys(saved.personas).join(', ') || 'none');
 
 // ── REST ────────────────────────────────────────────────────────────────────
 app.get('/api/transcript', (_req, res) => res.json(manager?.getTranscriptLog()?.slice(-100) || []));
 app.get('/api/personas',   (_req, res) => res.json(saved.personas));
 app.get('/api/phrases',    (_req, res) => res.json(saved.phraseGroups));
+app.get('/api/presence',   (_req, res) => res.json(manager?.getPresenceStatus() || {}));
 app.get('/api/status',     (_req, res) => {
   const cfg = readEnvConfig();
-  res.json({ channel: cfg.channel, bots: cfg.bots.map(b => b.username), started: isStarted, interval: currentInterval });
+  res.json({ channel: cfg.channel, bots: cfg.bots.map(b => b.username), started: isStarted });
 });
 
 // ── Socket.IO ───────────────────────────────────────────────────────────────
 io.on('connection', socket => {
   console.log('[server] connected', socket.id);
   const cfg = readEnvConfig();
-
-  // Use saved interval if it exists, otherwise env
-  const initInterval = saved.interval || cfg.interval;
-  currentInterval = initInterval;
-
-  socket.emit('config', {
-    channel: cfg.channel,
-    interval: initInterval,
-  });
+  socket.emit('config', { channel: cfg.channel, botsPerTranscript: saved.botsPerTranscript || 2 });
   socket.emit('personas:update', saved.personas);
   socket.emit('phrases:update', saved.phraseGroups);
 
   if (isStarted && startedBots.length > 0) {
     socket.emit('bots:started', { bots: startedBots });
     startedBots.forEach(u => socket.emit('bot:status', { username: u, state: 'connected', message: 'Подключён' }));
+    if (manager) socket.emit('presence:update', manager.getPresenceStatus());
   }
 
-  // Manual message
   socket.on('send:manual', async (data: { targets: string[]; message: string }) => {
     if (manager && data.targets?.length && data.message)
       await manager.sendManual(data.targets, data.message);
   });
 
-  // Change interval live
-  socket.on('set:interval', (data: { seconds: number }) => {
-    const s = Math.max(10, Math.min(3600, parseInt(String(data.seconds)) || 60));
-    currentInterval = s;
-    saved.interval = s;
-    saveToDisk(saved);
-    if (manager) manager.setInterval(s);
-    io.emit('config', { channel: readEnvConfig().channel, interval: s });
-    console.log('[server] interval changed to', s + 's');
-  });
-
-  // Save persona
   socket.on('set:persona', (data: { username: string; role: string; sys: string }) => {
     const k = data.username.toLowerCase();
-    const cfg: PersonaConfig = { role: data.role, sys: data.sys };
-    saved.personas[k] = cfg;
+    const cfg2: PersonaConfig = { role: data.role, sys: data.sys };
+    saved.personas[k] = cfg2;
     saveToDisk(saved);
-    if (manager) manager.setPersona(data.username, cfg);
+    if (manager) manager.setPersona(data.username, cfg2);
     io.emit('personas:update', saved.personas);
     socket.emit('persona:saved', { username: data.username, ok: true });
-    console.log('[server] persona saved for', data.username);
   });
-
-  // Delete persona
   socket.on('del:persona', (data: { username: string }) => {
     delete saved.personas[data.username.toLowerCase()];
     saveToDisk(saved);
-    if (manager) manager.setPersona(data.username, { role: 'default', sys: '' });
     io.emit('personas:update', saved.personas);
   });
-
-  // Save phrases
   socket.on('set:phrases', (data: Record<string, string[]>) => {
     saved.phraseGroups = data;
     saveToDisk(saved);
     io.emit('phrases:update', saved.phraseGroups);
-    console.log('[server] phrases saved:', Object.keys(data).join(', '));
   });
-
+  socket.on('set:bots_per_transcript', (data: { n: number }) => {
+    const n = Math.max(1, parseInt(String(data.n)) || 2);
+    saved.botsPerTranscript = n;
+    saveToDisk(saved);
+    if (manager) manager.setBotsPerTranscript(n);
+    io.emit('config', { botsPerTranscript: n });
+  });
   socket.on('get:personas', () => socket.emit('personas:update', saved.personas));
   socket.on('get:phrases',  () => socket.emit('phrases:update', saved.phraseGroups));
-
   socket.on('disconnect', () => console.log('[server] disconnected', socket.id));
 });
 
 // ── Auto-start ───────────────────────────────────────────────────────────────
 async function autoStart(): Promise<void> {
   const cfg = readEnvConfig();
-  const interval = saved.interval || cfg.interval;
-  currentInterval = interval;
-
-  console.log('[server] channel="' + cfg.channel + '" bots=' + cfg.bots.length + ' interval=' + interval + 's groq=' + (cfg.groqKey ? 'OK' : 'MISSING'));
+  console.log('[server] channel="' + cfg.channel + '" bots=' + cfg.bots.length + ' groq=' + (cfg.groqKey ? 'OK' : 'MISSING'));
 
   if (!cfg.channel || !cfg.groqKey || !cfg.bots.length) {
-    console.warn('[server] missing config, bots not started');
+    console.warn('[server] missing config');
     return;
   }
 
-  if (manager) { await manager.stop(); manager = null; await new Promise(r => setTimeout(r, 1500)); }
+  if (manager) { await manager.stop(); manager = null; }
+  if (transcriber) { transcriber.stop(); transcriber = null; }
+  await new Promise(r => setTimeout(r, 1500));
 
   manager = new BotManager(
     cfg.bots, cfg.channel, cfg.groqKey,
     {
-      interval,
       language: cfg.language,
       context: cfg.context,
       settings: { useEmoji: true, chatContext: true },
       savedPersonas: saved.personas,
+      botsPerTranscript: saved.botsPerTranscript || 2,
     },
-    (event, data) => io.emit(event, data)
+    (event, data) => {
+      io.emit(event, data);
+      // When presence changes, push full status update
+      if (event === 'presence:active' && manager) {
+        io.emit('presence:update', manager.getPresenceStatus());
+      }
+    }
   );
 
-  manager.start();
   startedBots = manager.getUsernames();
   isStarted = true;
   io.emit('bots:started', { bots: startedBots });
-  console.log('[server] started', startedBots.length, 'bots, interval=' + interval + 's');
+  console.log('[server] started', startedBots.length, 'bots');
 
+  // ── Start transcription ──────────────────────────────────────────────────
+  transcriber = new TranscriptionService(cfg.groqKey, cfg.channel);
+  transcriber.start((result) => {
+    console.log('[transcription] TEXT:', result.text.slice(0, 80));
+    // Broadcast to UI
+    io.emit('transcription:new', { text: result.text, timestamp: result.timestamp });
+    // Tell bots to respond
+    if (manager) manager.onTranscription(result.text);
+  });
+  console.log('[server] transcription service started');
+
+  // ── Stream info ──────────────────────────────────────────────────────────
   const info = await getStreamData(cfg.channel);
   io.emit('stream:info', { live: info.live, game: (info as any).game, viewers: (info as any).viewers });
-  if ((info as any).viewers != null) io.emit('stream:viewers', { viewers: (info as any).viewers });
-
-  if (info.live && manager) manager.startViewerSim(cfg.channel).catch(() => {});
 
   if (streamPoll) clearInterval(streamPoll);
   streamPoll = setInterval(async () => {
@@ -268,6 +233,7 @@ http.listen(PORT, () => {
 
 process.on('SIGTERM', async () => {
   if (streamPoll) clearInterval(streamPoll);
+  if (transcriber) transcriber.stop();
   if (manager) await manager.stop();
   process.exit(0);
 });

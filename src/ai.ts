@@ -1,32 +1,32 @@
 import Groq from 'groq-sdk';
 
+export interface PersonaConfig {
+  role: string;
+  sys: string;
+}
+
 export interface TranscriptEntry {
-  username: string;
-  message: string;
-  trigger: string;
+  heard: string;        // what Whisper heard
+  username: string;     // which bot responded
+  message: string;      // what the bot wrote
   persona: string;
   timestamp: number;
 }
 
 interface Msg { role: 'user' | 'assistant'; content: string; }
 
-export interface PersonaConfig {
-  role: string;
-  sys: string;
-}
-
 const BUILTIN: Record<string, PersonaConfig> = {
   'olegzhoskii': {
     role: 'ukrainian_teen',
     sys: `Ти — 15-річний українець-школяр, фанат стримера. ТІЛЬКИ українська мова.
-Стиль: "бро", "топ", "лол", "кайф", "gg", "пг", помилки як школяр. Макс 8 слів.`,
+Стиль: "бро", "топ", "лол", "кайф", "gg", помилки як школяр. Макс 8 слів.`,
   },
 };
 
 export class AIService {
   private groq: Groq;
   private histories = new Map<string, Msg[]>();
-  private realChatSamples: string[] = [];   // real viewer messages for mimicry
+  private realChatSamples: string[] = [];
   private settings: Record<string, boolean>;
   private customPersonas = new Map<string, PersonaConfig>();
   public transcriptLog: TranscriptEntry[] = [];
@@ -34,18 +34,15 @@ export class AIService {
   constructor(apiKey: string, settings: Record<string, boolean> = {}, savedPersonas?: Record<string, PersonaConfig>) {
     this.groq = new Groq({ apiKey });
     this.settings = settings;
-    // Load built-ins
     for (const [k, v] of Object.entries(BUILTIN)) this.customPersonas.set(k, v);
-    // Load saved
     if (savedPersonas) {
       for (const [k, v] of Object.entries(savedPersonas)) this.customPersonas.set(k.toLowerCase(), v);
     }
   }
 
   setPersona(username: string, cfg: PersonaConfig): void {
-    const k = username.toLowerCase();
-    this.customPersonas.set(k, cfg);
-    this.histories.delete(k);
+    this.customPersonas.set(username.toLowerCase(), cfg);
+    this.histories.delete(username.toLowerCase());
   }
 
   getPersonas(): Record<string, PersonaConfig> {
@@ -54,87 +51,70 @@ export class AIService {
     return out;
   }
 
-  // Called for every real viewer message
   addRealMessage(displayName: string, message: string): void {
     this.realChatSamples.push(displayName + ': ' + message);
     if (this.realChatSamples.length > 30) this.realChatSamples.shift();
   }
 
-  async generateMessage(
+  /**
+   * Generate a message BASED ON transcription from the stream.
+   * This is the ONLY way bots should send messages.
+   */
+  async generateFromTranscription(
     username: string,
-    context: string,
+    transcribedText: string,
     language: string,
     botIndex = 0,
     taggedMessage?: string
   ): Promise<string> {
     const k = username.toLowerCase();
     const custom = this.customPersonas.get(k);
+    const lang = custom ? '' : (language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English');
 
-    // --- Build system prompt ---
+    // Build recent real chat context for style mimicry
+    const chatCtx = this.realChatSamples.length >= 3
+      ? '\nRecent real viewer messages (copy their style):\n' + this.realChatSamples.slice(-8).join('\n')
+      : '';
+
     let system: string;
+    let userPrompt: string;
 
     if (taggedMessage) {
-      // Tag reply — simple and direct
-      const lang = custom ? '' : (language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English');
-      system = [
-        custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. 1-2 sentences max.`,
-        `Someone mentioned you: "${taggedMessage}"`,
-        'Reply naturally and briefly. Output ONLY the reply text.',
-      ].join('\n');
-    } else if (this.realChatSamples.length >= 5) {
-      // CORE STRATEGY: Learn from real chat and blend in perfectly
-      const samples = this.realChatSamples.slice(-15);
-      const lang = custom ? '' : (language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English');
-
+      system = custom
+        ? custom.sys + '\nOutput ONLY the reply. Max 15 words.'
+        : `You are a Twitch viewer. Write in ${lang}. Max 2 sentences.`;
+      userPrompt = `Someone tagged you: "${taggedMessage}". Reply naturally.`;
+    } else {
       system = [
         custom
           ? custom.sys
           : `You are "${username}", a real Twitch chat viewer. Write in ${lang} only.`,
         '',
-        'Here are messages that REAL viewers just wrote in this stream\'s chat:',
-        '---',
-        ...samples,
-        '---',
+        `The streamer just said (transcribed from audio): "${transcribedText}"`,
+        chatCtx,
         '',
-        'Study these messages carefully:',
-        '- What game/topic are they discussing?',
-        '- What style, slang, and tone are they using?',
-        '- How long are typical messages?',
-        '',
-        'Now write ONE new message that blends in PERFECTLY with the real viewers above.',
-        'Your message must be about the SAME topic they are discussing.',
-        'Match their language, style, and length exactly.',
-        'Do NOT talk about unrelated things.',
-        'Output ONLY the chat message. No quotes. No username prefix.',
-      ].join('\n');
-
-      if (context) system += '\nExtra context: ' + context;
-    } else {
-      // Not enough real chat yet — use safe generic
-      const lang = custom ? '' : (language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English');
-      system = [
-        custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. 2-10 words.`,
-        context ? 'Stream: ' + context : '',
-        'Write ONE short natural viewer message. Output ONLY the message.',
+        'Write ONE short chat message reacting to what the streamer JUST SAID.',
+        'Your reaction must be directly about what was transcribed.',
+        'Match the style and length of the real viewer messages above.',
+        'Output ONLY the chat message. No quotes. No username prefix. Max 15 words.',
+        'Sound like a real human viewer.',
       ].filter(Boolean).join('\n');
+      userPrompt = 'React to what the streamer just said.';
     }
 
     const history = this.histories.get(k) || [];
-    const trigger = taggedMessage
-      ? `Reply to: "${taggedMessage}"`
-      : 'Write one chat message now.';
 
     try {
       const res = await this.groq.chat.completions.create({
         model: 'llama-3.1-8b-instant',
         max_tokens: 60,
-        temperature: 0.85,
+        temperature: 0.88,
         frequency_penalty: 1.2,
         presence_penalty: 0.8,
         messages: [
           { role: 'system', content: system },
           ...history.slice(-4),
-          { role: 'user' as const, content: trigger },
+          { role: 'user' as const, content: userPrompt },
         ],
       });
 
@@ -147,15 +127,15 @@ export class AIService {
 
       const updated: Msg[] = [
         ...history,
-        { role: 'user' as const, content: trigger },
+        { role: 'user' as const, content: userPrompt },
         { role: 'assistant' as const, content: raw },
       ].slice(-6);
       this.histories.set(k, updated);
 
       this.transcriptLog.push({
+        heard: taggedMessage ? '[@tag]' : transcribedText,
         username,
         message: raw,
-        trigger: taggedMessage ? '@tag' : (this.realChatSamples.length >= 5 ? 'mimics chat' : 'generic'),
         persona: custom ? custom.role : 'default_' + botIndex,
         timestamp: Date.now(),
       });
@@ -164,17 +144,17 @@ export class AIService {
       return raw.slice(0, 200);
     } catch (e: any) {
       console.error('[ai] error for', username, ':', e.message);
-      return this.fallback(language, !!custom);
+      return '';
     }
   }
 
   private fallback(lang: string, isUkr = false): string {
-    if (isUkr) return ['gg', 'топ', 'лол', 'кайф', 'бро'][Math.floor(Math.random() * 5)];
+    if (isUkr) return '';  // Ukrainian bot stays quiet on fallback
     const f: Record<string, string[]> = {
-      ru: ['gg', 'лол', 'давай!', 'ого', '🔥', 'норм', 'красавчик'],
-      en: ['gg', 'lol', 'nice', 'Pog', 'GG', 'hype'],
+      ru: ['gg', 'лол', 'давай!', 'ого', '🔥', 'норм'],
+      en: ['gg', 'lol', 'nice', 'Pog', 'GG'],
       kk: ['жарайсың', 'gg', 'алға'],
     };
-    return (f[lang] || f.en)[Math.floor(Math.random() * 7)];
+    return (f[lang] || f.en)[Math.floor(Math.random() * 6)];
   }
 }
