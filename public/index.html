@@ -29,10 +29,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .bdg{background:var(--pd);color:var(--pl);border:1px solid rgba(124,58,237,.3);padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600}
 .sdot{width:7px;height:7px;border-radius:50%;background:var(--tx3);display:inline-block;flex-shrink:0}
 .sdot.on{background:var(--gr);box-shadow:0 0 5px var(--gr);animation:bl 2s infinite}
+.sdot.watch{background:var(--yw);box-shadow:0 0 5px var(--yw)}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.4}}
 .nb{display:flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid var(--b2);border-radius:6px;background:transparent;color:var(--tx2);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s;white-space:nowrap;text-decoration:none}
 .nb:hover{border-color:var(--pu);color:var(--pl)}
-.int-badge{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--gr);padding:1px 7px;border-radius:20px;font-size:11px;font-family:monospace}
+
 .layout{flex:1;display:grid;grid-template-columns:310px 1fr 275px;overflow:hidden;min-height:0}
 /* LEFT */
 .pl{background:var(--sf);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden}
@@ -57,6 +58,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .cn:hover{text-decoration:underline}
 .ct{color:var(--tx2);font-size:12px;line-height:1.45;word-break:break-word}
 .cm.sys .ct{color:var(--tx3);font-size:11px;font-style:italic}
+.cm.transcribed .cm-av{background:rgba(124,58,237,.4)!important}
+.cm.transcribed .ct{color:var(--pl)}
 .cma{display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:2px;background:var(--ca);border:1px solid var(--b2);border-radius:6px;padding:2px 3px}
 .cab{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px}
 .cab:hover{color:var(--tx);background:rgba(255,255,255,.08)}
@@ -106,14 +109,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .at{flex:1;padding:4px;border-radius:6px;cursor:pointer;color:var(--tx2);font-size:11px;font-weight:500;border:none;background:var(--ca);font-family:inherit;transition:all .15s;text-align:center}
 .at.on{background:var(--pu);color:#fff}
 .at:hover:not(.on){background:var(--b2);color:var(--tx)}
-/* Interval row */
-.int-row{display:flex;align-items:center;gap:8px;padding:7px 0 5px;border-bottom:1px solid var(--b1);margin-bottom:5px}
-.int-label{font-size:11px;color:var(--tx3);white-space:nowrap}
-.int-slider{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--b2);outline:none;cursor:pointer}
-.int-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--pu);border-radius:50%;cursor:pointer}
-.int-val{font-size:11px;font-family:monospace;color:var(--pl);font-weight:600;min-width:32px;text-align:right}
-.int-apply{padding:4px 9px;background:var(--pu);border:none;border-radius:5px;color:#fff;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600;flex-shrink:0}
-.int-apply:hover{background:var(--pl)}
+/* Bots per transcript */
+.bpt-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);margin-bottom:6px}
+.bpt-label{font-size:11px;color:var(--tx3);white-space:nowrap}
+.bpt-btns{display:flex;gap:3px}
+.bpt-btn{width:24px;height:24px;border-radius:5px;border:1px solid var(--b2);background:transparent;color:var(--tx2);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.bpt-btn.on{background:var(--pu);border-color:var(--pu);color:#fff}
+.bpt-btn:hover:not(.on){border-color:var(--pu);color:var(--pl)}
+/* Presence legend */
+.presence-info{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:7px;padding:7px 9px;margin-bottom:6px;font-size:11px;color:var(--tx3)}
+.presence-info b{color:var(--gr)}
 .asrch{display:flex;align-items:center;gap:5px;background:var(--ca);border:1px solid var(--b1);border-radius:6px;padding:5px 8px;margin-bottom:4px}
 .asrch input{background:transparent;border:none;color:var(--tx);font-family:inherit;font-size:12px;outline:none;flex:1}
 .asrch input::placeholder{color:var(--tx3)}
@@ -128,14 +133,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .ain{flex:1;min-width:0;cursor:pointer}
 .ain-n{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ain-s{font-size:10px;color:var(--tx3);margin-top:1px}
-.ain-p{font-size:10px;color:var(--pl);margin-top:1px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ain-p{font-size:10px;color:var(--pl);margin-top:1px;font-style:italic}
+.ain-pres{font-size:10px;margin-top:1px;display:flex;align-items:center;gap:3px}
 .air{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
 .adot{width:7px;height:7px;border-radius:50%;background:var(--tx3)}
 .adot.on{background:var(--gr);box-shadow:0 0 5px var(--gr)}
 .adot.err{background:var(--rd)}
 .adot.cn{background:var(--yw);animation:bl 1s infinite}
 .amsg{font-size:10px;color:var(--tx3);font-family:monospace}
-.epbtn{width:20px;height:20px;background:none;border:1px solid var(--b2);border-radius:4px;color:var(--tx3);cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.epbtn{width:20px;height:20px;background:none;border:1px solid var(--b2);border-radius:4px;color:var(--tx3);cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center}
 .epbtn:hover{border-color:var(--pu);color:var(--pl)}
 .af{padding:7px 11px;border-top:1px solid var(--b1);flex-shrink:0}
 .sab{width:100%;padding:6px;background:var(--ca);border:1px solid var(--b2);border-radius:6px;color:var(--tx2);cursor:pointer;font-size:11px;font-family:inherit}
@@ -148,6 +154,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .fp-body::-webkit-scrollbar{width:4px}
 .fp-body::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
 .fp-foot{padding:10px 20px;border-top:1px solid var(--b1);flex-shrink:0;display:flex;gap:10px;align-items:center}
+/* Phrases */
 .pg-grid{display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start}
 .pg-card{background:var(--ca);border:1px solid var(--b2);border-radius:10px;padding:14px;width:185px}
 .pg-name{font-weight:600;color:var(--pl);font-size:13px;margin-bottom:6px}
@@ -157,12 +164,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .pg-btn:hover{border-color:var(--pu);color:var(--pl)}
 .pg-del{padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-family:inherit;border:1px solid var(--b2);background:transparent;color:var(--tx3)}
 .pg-del:hover{border-color:var(--rd);color:var(--rd)}
-.tr-entry{padding:9px 0;border-bottom:1px solid var(--b1);display:grid;grid-template-columns:52px 1fr;gap:6px}
-.tr-time{font-size:10px;color:var(--tx3);font-family:monospace;padding-top:1px}
-.tr-n{font-weight:600;font-size:12px;margin-bottom:2px}
-.tr-m{font-size:12px;color:var(--tx);margin-bottom:3px;word-break:break-word}
-.tr-r{font-size:10px;color:var(--tx3);font-style:italic}
-.tr-p{display:inline-block;background:var(--pd);color:var(--pl);border-radius:10px;padding:1px 6px;font-size:10px;font-family:monospace;margin-right:4px}
+/* Transcript */
+.tr-block{margin-bottom:14px;border:1px solid var(--b2);border-radius:10px;overflow:hidden}
+.tr-heard{background:rgba(124,58,237,.08);padding:10px 14px;font-size:12px;border-bottom:1px solid var(--b1)}
+.tr-heard-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--pl);margin-bottom:4px;font-weight:600}
+.tr-heard-text{color:var(--tx2);line-height:1.4}
+.tr-responses{padding:8px 12px}
+.tr-resp{display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid var(--b1)}
+.tr-resp:last-child{border-bottom:none}
+.tr-resp-name{font-weight:600;font-size:11px;min-width:90px;flex-shrink:0}
+.tr-resp-msg{font-size:12px;color:var(--tx)}
+.tr-resp-meta{font-size:10px;color:var(--tx3);font-style:italic;margin-left:auto;flex-shrink:0;font-family:monospace}
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center}
 .ov.open{display:flex}
@@ -185,8 +197,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 .toast{background:var(--ca);border:1px solid var(--b2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;align-items:center;gap:6px;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:ti .2s ease;max-width:320px;pointer-events:all}
 @keyframes ti{from{transform:translateX(50px);opacity:0}to{transform:none;opacity:1}}
 .toast.ok{border-left:3px solid var(--gr)}.toast.err{border-left:3px solid var(--rd)}.toast.info{border-left:3px solid var(--yw)}
-.save-indicator{font-size:10px;color:var(--gr);font-family:monospace;transition:opacity .5s;opacity:0}
-.save-indicator.show{opacity:1}
+/* Transcript pulse */
+.tr-pulse{animation:trpulse 0.6s ease}
+@keyframes trpulse{0%{background:rgba(124,58,237,.2)}100%{background:transparent}}
 </style>
 </head>
 <body>
@@ -198,7 +211,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
       <button class="tab on" onclick="switchTab('chat',this)">Чат</button>
       <button class="tab" onclick="switchTab('accounts',this)">Аккаунты</button>
       <button class="tab" onclick="switchTab('phrases',this)">Фразы ✎</button>
-      <button class="tab" onclick="switchTab('transcript',this)">Транскрипция</button>
+      <button class="tab" onclick="switchTab('transcript',this)">Транскрипция 🎙</button>
     </div>
   </div>
   <div class="nav-r">
@@ -208,7 +221,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
     <span class="sep">·</span>
     <div class="chip"><span class="sdot" id="sdot"></span>&nbsp;<b id="gst">Не запущено</b></div>
     <span class="sep">·</span>
-    <div class="chip">⏱ <span class="int-badge" id="nav-int">—</span></div>
+    <div class="chip">👥 присутствие: <span id="nav-pres" style="color:var(--gr);font-weight:600">—</span></div>
     <a class="nb" id="twitch-open" href="#" target="_blank">↗ Twitch</a>
   </div>
 </div>
@@ -284,12 +297,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
         <button class="at" onclick="setMode('rnd',this)">Случайный</button>
         <button class="at" onclick="setMode('ord',this)">По порядку</button>
       </div>
-      <!-- INTERVAL — actually applies to server -->
-      <div class="int-row">
-        <span class="int-label">Интервал:</span>
-        <input type="range" class="int-slider" id="int-slider" min="10" max="600" value="60" oninput="onIntDrag(this.value)">
-        <span class="int-val" id="int-val">60с</span>
-        <button class="int-apply" onclick="applyInterval()" title="Применить">✓</button>
+      <!-- Bots per transcription -->
+      <div class="bpt-row">
+        <span class="bpt-label">Отвечают на транскрипцию:</span>
+        <div class="bpt-btns" id="bpt-btns"></div>
+      </div>
+      <!-- Presence info -->
+      <div class="presence-info">
+        👁 <b>Присутствие 100%</b> — каждый бот смотрит стрим как залогиненный пользователь через свой токен. Баллы канала накапливаются автоматически.
       </div>
       <div style="margin-bottom:5px">
         <a class="nb" id="tw-link" href="#" target="_blank" style="width:100%;justify-content:center">↗ Открыть канал</a>
@@ -308,28 +323,30 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 <div class="fp" id="phrase-page">
   <div class="fp-head">
     <div class="fp-title">📋 Редактор быстрых фраз</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="save-indicator" id="pg-saved">✓ Сохранено</span>
-      <button class="nb" onclick="switchTab('chat',document.querySelector('.tab'))">✕ Закрыть</button>
-    </div>
+    <button class="nb" onclick="switchTab('chat',document.querySelector('.tab'))">✕ Закрыть</button>
   </div>
   <div class="fp-body"><div class="pg-grid" id="pg-grid"></div></div>
   <div class="fp-foot">
     <button style="padding:7px 16px;background:var(--pu);border:none;border-radius:7px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600" onclick="openAddPG()">+ Добавить группу</button>
-    <span style="font-size:11px;color:var(--tx3)">Изменения сохраняются автоматически</span>
+    <span style="font-size:11px;color:var(--tx3)">Сохраняется автоматически</span>
   </div>
 </div>
 
 <!-- TRANSCRIPT PAGE -->
 <div class="fp" id="transcript-page">
   <div class="fp-head">
-    <div class="fp-title">📝 Транскрипция AI — почему бот написал то или иное</div>
+    <div class="fp-title">🎙 Транскрипция — что услышал Groq и как ответили боты</div>
     <div style="display:flex;gap:8px">
       <button class="nb" onclick="loadTranscript()">↻ Обновить</button>
       <button class="nb" onclick="switchTab('chat',document.querySelector('.tab'))">✕</button>
     </div>
   </div>
-  <div class="fp-body" id="tr-body"><div style="text-align:center;padding:40px;color:var(--tx3);font-size:12px">Нажми ↻ Обновить</div></div>
+  <div class="fp-body" id="tr-body">
+    <div style="text-align:center;padding:40px;color:var(--tx3);font-size:12px">
+      <p style="margin-bottom:8px">Нажми ↻ Обновить чтобы загрузить</p>
+      <p style="font-size:11px;color:var(--tx3)">Здесь будет показано что Groq Whisper услышал со стрима и как на это ответил каждый бот</p>
+    </div>
+  </div>
 </div>
 
 <!-- PERSONA MODAL -->
@@ -345,13 +362,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
     </div>
     <div class="mf"><label>Название роли</label><input id="pm-role" placeholder="hype_fan"/></div>
     <div class="mf">
-      <label>System prompt — как AI должен себя вести (сохраняется на сервере)</label>
-      <textarea id="pm-sys" rows="8" placeholder="You are a Twitch viewer named...&#10;Write in Russian.&#10;Short messages 2-10 words."></textarea>
+      <label>System prompt — как отвечать на транскрипцию стримера (сохраняется на сервере)</label>
+      <textarea id="pm-sys" rows="8" placeholder="You are a Twitch viewer named...&#10;React to what the streamer says.&#10;Write in Russian. Max 10 words."></textarea>
     </div>
     <div class="mb">
       <button class="bdel" id="pm-del-btn" onclick="deletePersona()">Удалить</button>
       <button class="bc" onclick="closePersona()">Отмена</button>
-      <button class="bok" onclick="savePersona()">💾 Сохранить на сервере</button>
+      <button class="bok" onclick="savePersona()">💾 Сохранить</button>
     </div>
   </div>
 </div>
@@ -376,10 +393,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);height:
 const socket = io();
 let bots={}, sendMode='sel', ordIdx=0, startTime=null, uptTimer=null;
 let channelName='', errCnt=0, replyTo=null, editingGroup=null, editingPersonaUser=null;
-let currentInterval=60;
-let personas={};  // {username: {role, sys}} — synced with server
-let PG={};        // phrase groups — synced with server
-let pendingInterval=60;
+let personas={}, PG={};
+let botsPerTranscript=2, totalBots=0;
+let presenceStatus={}; // username -> bool
+// Transcript grouped by "heard" session
+let transcriptSessions=[]; // [{heard, timestamp, responses:[{username,message,persona}]}]
+let currentSession=null;
 
 const COLORS=['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#9333ea','#c2410c'];
 const cmap=new Map(); let ci=0;
@@ -387,127 +406,143 @@ function bc(u){if(!cmap.has(u))cmap.set(u,COLORS[ci++%COLORS.length]);return cma
 
 const PRESETS=[
   {label:'🇺🇦 Українець 15л',role:'ukrainian_teen',sys:`Ти — 15-річний українець-школяр, фанат стримера. ТІЛЬКИ українська мова.
-Стиль: "бро", "топ", "лол", "кайф", "gg", помилки як школяр. Макс 8 слів.`},
-  {label:'🔥 Хайп фан',role:'hype_fan',sys:`You are an excited Twitch viewer. Hyped short reactions.
-Write in Russian. 2-8 words. Very energetic.`},
-  {label:'😎 Чилл',role:'chill',sys:`You are a chill Twitch viewer. Casual brief comments.
-Write in Russian. 2-10 words. Uses лол/lmao.`},
-  {label:'🎮 Геймер',role:'gamer',sys:`You are an experienced gamer watching stream. Short game comments.
+Реагуй на те що сказав стример. "бро", "топ", "лол", "кайф". Макс 8 слів.`},
+  {label:'🔥 Хайп фан',role:'hype_fan',sys:`You are an excited Twitch fan. React to what the streamer says.
+Write in Russian. 2-8 words. Very energetic reactions.`},
+  {label:'😎 Чилл',role:'chill',sys:`You are a chill viewer. Brief casual reactions to the stream.
+Write in Russian. 2-10 words. Relaxed. Uses лол.`},
+  {label:'🎮 Геймер',role:'gamer',sys:`You are an experienced gamer. Comment on the gameplay decisions.
 Write in Russian. 3-12 words. Shows game knowledge.`},
-  {label:'😂 Комик',role:'comedian',sys:`You are a funny Twitch viewer. Light jokes. Never mean.
+  {label:'😂 Комик',role:'comedian',sys:`You are a funny viewer. React with jokes to what the streamer says.
 Write in Russian. 2-12 words.`},
-  {label:'📊 Аналитик',role:'analyst',sys:`You are a calm analytical viewer. Brief smart observations.
+  {label:'📊 Аналитик',role:'analyst',sys:`You are a calm analytical viewer. Brief smart comments on the gameplay.
 Write in Russian. 3-12 words.`},
-  {label:'🇰🇿 Казах',role:'kazakh',sys:`Сен — қазақ Twitch viewer. Тек қазақша жаз.
-Қысқа хабарлар 2-8 сөз. Twitch emotes OK.`},
-  {label:'🤗 Саппортер',role:'supporter',sys:`You are a loyal supportive Twitch viewer. Encouraging messages.
-Write in Russian. 2-10 words.`},
+  {label:'🇰🇿 Казах',role:'kazakh',sys:`Сен — қазақ viewer. Стримердің айтқанына жауап бер. Тек қазақша. 2-8 сөз.`},
+  {label:'🤗 Саппортер',role:'supporter',sys:`You are a loyal supportive viewer. Encourage the streamer.
+Write in Russian. 2-10 words. Warm reactions.`},
 ];
 
-// ── SOCKET ──────────────────────────────────────────────────────────────────
-socket.on('connect', () => {
-  socket.emit('get:config');
-  socket.emit('get:personas');
-  socket.emit('get:phrases');
-});
+// ── SOCKET ──
+socket.on('connect', () => { socket.emit('get:config'); socket.emit('get:personas'); socket.emit('get:phrases'); });
 
 socket.on('config', cfg => {
   channelName = cfg.channel || '';
-  if (cfg.interval) {
-    currentInterval = cfg.interval;
-    pendingInterval = cfg.interval;
-    updateIntUI(cfg.interval);
-  }
+  if (cfg.botsPerTranscript) { botsPerTranscript = cfg.botsPerTranscript; renderBPT(); }
   if (channelName) {
-    const url = 'https://www.twitch.tv/' + channelName;
-    ['mc','sb-ch','ch-n'].forEach(id => document.getElementById(id).textContent = channelName);
-    document.getElementById('twitch-open').href = url;
-    document.getElementById('twitch-open').textContent = '↗ ' + channelName;
-    document.getElementById('tw-link').href = url;
+    const url='https://www.twitch.tv/'+channelName;
+    ['mc','sb-ch','ch-n'].forEach(id => document.getElementById(id).textContent=channelName);
+    document.getElementById('twitch-open').href=url;
+    document.getElementById('twitch-open').textContent='↗ '+channelName;
+    document.getElementById('tw-link').href=url;
     loadEmbed(channelName);
   }
 });
 
 socket.on('bots:started', d => {
-  if (!startTime) { startTime=Date.now(); startUptime(); }
-  document.getElementById('sdot').className = 'sdot on';
-  document.getElementById('gst').textContent = 'Запущено';
-  const n = d.bots.length;
-  ['ma','sb-acc','sb-auth'].forEach(id => document.getElementById(id).textContent = n);
-  d.bots.forEach(u => { const k=u.toLowerCase(); if(!bots[k]) bots[k]={display:u,state:'connecting',msgs:0,sel:true}; });
-  renderAcc();
-  sysMsg('✅ ' + n + ' ботов · интервал ' + currentInterval + 'с · учатся у чата');
-  toast('ok', '✅ ' + n + ' ботов запущено');
+  if(!startTime){startTime=Date.now();startUptime();}
+  document.getElementById('sdot').className='sdot on';
+  document.getElementById('gst').textContent='Запущено';
+  totalBots=d.bots.length;
+  ['ma','sb-acc','sb-auth'].forEach(id=>document.getElementById(id).textContent=d.bots.length);
+  d.bots.forEach(u=>{const k=u.toLowerCase();if(!bots[k])bots[k]={display:u,state:'connecting',msgs:0,sel:true,presence:false};});
+  renderAcc(); renderBPT();
+  sysMsg('✅ '+d.bots.length+' ботов · пишут ТОЛЬКО на транскрипцию стрима · присутствие 100%');
+  toast('ok','✅ '+d.bots.length+' ботов запущено');
 });
 
-socket.on('bot:status', d => {
+socket.on('bot:status', d=>{
   const k=d.username.toLowerCase();
-  if(!bots[k]) bots[k]={display:d.username,state:d.state,msgs:0,sel:true};
+  if(!bots[k]) bots[k]={display:d.username,state:d.state,msgs:0,sel:true,presence:false};
   else { bots[k].state=d.state; bots[k].display=d.username; }
   updDot(k,d.state,d.message);
 });
+
 socket.on('chat:message', d => addMsg(d.username,d.message,d.isBot,d.color,d.displayName));
-socket.on('bot:message', d => {
+
+socket.on('bot:message', d=>{
   const k=d.username.toLowerCase();
-  if(!bots[k]) bots[k]={display:d.username,state:'connected',msgs:0,sel:true};
+  if(!bots[k]) bots[k]={display:d.username,state:'connected',msgs:0,sel:true,presence:false};
   bots[k].msgs=(bots[k].msgs||0)+1;
   const el=document.getElementById('amsg-'+k); if(el) el.textContent=bots[k].msgs+' msg';
 });
 
-socket.on('personas:update', data => {
-  personas = data || {};
+// New transcription heard
+socket.on('transcription:new', d=>{
+  sysMsg('🎙 Услышал: '+d.text.slice(0,80)+(d.text.length>80?'...':''));
+  currentSession={heard:d.text, timestamp:d.timestamp, responses:[]};
+  transcriptSessions.unshift(currentSession);
+  if(transcriptSessions.length>50) transcriptSessions.pop();
+});
+
+// Bot responded to transcription
+socket.on('transcript:entry', d=>{
+  if(currentSession && Math.abs(d.timestamp-currentSession.timestamp)<60000){
+    currentSession.responses.push({username:d.username,message:d.message,persona:d.persona,timestamp:d.timestamp});
+  }
+  // If transcript page is open, refresh
+  if(document.getElementById('transcript-page').style.display!=='none') renderTranscriptPage();
+});
+
+socket.on('personas:update', data=>{ personas=data||{}; renderAcc(); });
+socket.on('persona:saved', d=>{ if(d.ok) toast('ok','✅ Личность сохранена'); });
+socket.on('phrases:update', data=>{ if(data&&Object.keys(data).length){ PG=data; renderPhrases(); } });
+
+socket.on('presence:update', data=>{
+  presenceStatus=data||{};
+  Object.keys(bots).forEach(k=>{bots[k].presence=presenceStatus[k]||false;});
+  const active=Object.values(presenceStatus).filter(Boolean).length;
+  document.getElementById('nav-pres').textContent=active+'/'+totalBots;
   renderAcc();
 });
-socket.on('persona:saved', d => {
-  if(d.ok) toast('ok','✅ Личность сохранена на сервере');
+socket.on('presence:active', d=>{
+  const k=d.username.toLowerCase();
+  if(bots[k]) bots[k].presence=true;
+  presenceStatus[k]=true;
+  const active=Object.values(presenceStatus).filter(Boolean).length;
+  document.getElementById('nav-pres').textContent=active+'/'+totalBots;
+  const pdot=document.getElementById('pdot-'+k); if(pdot){pdot.className='sdot watch';pdot.title='Смотрит стрим';}
 });
 
-socket.on('phrases:update', data => {
-  if (data && Object.keys(data).length > 0) {
-    PG = data;
-    renderPhrases();
-  }
-});
-
-socket.on('bot:error', d => {
-  errCnt++;
-  document.getElementById('en').textContent = errCnt;
-  document.getElementById('estrip').style.display = '';
+socket.on('bot:error', d=>{
+  errCnt++; document.getElementById('en').textContent=errCnt;
+  document.getElementById('estrip').style.display='';
   const el=document.getElementById('elist');
   const it=document.createElement('div'); it.className='eit';
   it.textContent=new Date().toTimeString().slice(0,8)+' '+d.username+': '+d.message;
   el.appendChild(it);
   if(d.code!=='say_error') toast('err','⚠ '+d.username+': '+d.message);
 });
-socket.on('stream:info', d => {
+socket.on('stream:info', d=>{
   document.getElementById('lpill').style.display=d.live?'flex':'none';
   if(d.game) document.getElementById('game-n').textContent='· '+d.game;
   if(d.viewers!=null) document.getElementById('vcnt').textContent=d.viewers.toLocaleString();
 });
-socket.on('stream:viewers', d => document.getElementById('vcnt').textContent=d.viewers.toLocaleString());
+socket.on('stream:viewers', d=>document.getElementById('vcnt').textContent=d.viewers.toLocaleString());
 
-// ── INTERVAL ─────────────────────────────────────────────────────────────────
-function onIntDrag(v) {
-  pendingInterval = parseInt(v);
-  document.getElementById('int-val').textContent = v + 'с';
+// ── BOTS PER TRANSCRIPT ──
+function renderBPT(){
+  const btns=document.getElementById('bpt-btns'); if(!btns)return;
+  btns.innerHTML='';
+  const max=Math.max(4,totalBots)||4;
+  for(let i=1;i<=max;i++){
+    const b=document.createElement('button'); b.className='bpt-btn'+(i===botsPerTranscript?' on':'');
+    b.textContent=String(i); b.onclick=()=>setBPT(i);
+    btns.appendChild(b);
+  }
+  if(totalBots>4){
+    const b=document.createElement('button'); b.className='bpt-btn'+(totalBots===botsPerTranscript?' on':'');
+    b.textContent='Все'; b.onclick=()=>setBPT(totalBots);
+    btns.appendChild(b);
+  }
 }
-function applyInterval() {
-  const s = pendingInterval;
-  currentInterval = s;
-  updateIntUI(s);
-  socket.emit('set:interval', { seconds: s });
-  toast('ok', '✅ Интервал ' + s + 'с применён и сохранён');
-}
-function updateIntUI(v) {
-  document.getElementById('int-val').textContent = v + 'с';
-  document.getElementById('nav-int').textContent = v + 'с';
-  const sl=document.getElementById('int-slider'); if(sl) sl.value=v;
-  pendingInterval = v;
+function setBPT(n){
+  botsPerTranscript=n; socket.emit('set:bots_per_transcript',{n});
+  renderBPT(); toast('info','⚙ '+n+' ботов отвечают на каждую транскрипцию');
 }
 
-// ── EMBED ──────────────────────────────────────────────────────────────────
+// ── EMBED ──
 let embedLoaded=false;
-function loadEmbed(ch) {
+function loadEmbed(ch){
   if(embedLoaded)return; embedLoaded=true;
   const iframe=document.getElementById('sif'), ph=document.getElementById('sph');
   const host=window.location.hostname;
@@ -515,13 +550,10 @@ function loadEmbed(ch) {
   iframe.src='https://player.twitch.tv/?channel='+ch+'&parent='+host+'&muted=false&autoplay=true';
   iframe.style.display='block'; ph.style.display='none';
 }
-function expandStream() {
-  const el=document.querySelector('.sframe');
-  if(document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen?.();
-}
+function expandStream(){const el=document.querySelector('.sframe');if(document.fullscreenElement)document.exitFullscreen();else el.requestFullscreen?.();}
 
-// ── CHAT ──────────────────────────────────────────────────────────────────
-function addMsg(username,text,isBot,twitchColor,displayName) {
+// ── CHAT ──
+function addMsg(username,text,isBot,twitchColor,displayName){
   const feed=document.getElementById('feed');
   const emp=feed.querySelector('.cempty'); if(emp)emp.remove();
   const color=twitchColor||bc(username), name=displayName||username;
@@ -533,7 +565,7 @@ function addMsg(username,text,isBot,twitchColor,displayName) {
   feed.appendChild(d); feed.scrollTop=feed.scrollHeight;
   while(feed.children.length>300) feed.removeChild(feed.firstChild);
 }
-function sysMsg(t) {
+function sysMsg(t){
   const feed=document.getElementById('feed');
   const emp=feed.querySelector('.cempty'); if(emp)emp.remove();
   const d=document.createElement('div'); d.className='cm sys';
@@ -544,7 +576,7 @@ function clearChat(){document.getElementById('feed').innerHTML='<div class="cemp
 function setReply(u,t){replyTo={u,t};document.getElementById('rw').textContent='@'+u+' ';document.getElementById('rt').textContent=t;document.getElementById('rbar').classList.add('show');document.getElementById('msgi').focus();}
 function cancelReply(){replyTo=null;document.getElementById('rbar').classList.remove('show');}
 
-// ── SEND ──────────────────────────────────────────────────────────────────
+// ── SEND ──
 function sendManual(){
   const inp=document.getElementById('msgi'); let txt=inp.value.trim(); if(!txt)return;
   if(replyTo){txt='@'+replyTo.u+' '+txt;cancelReply();}
@@ -554,24 +586,24 @@ function sendManual(){
 function onK(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendManual();}}
 function onIn(el){document.getElementById('cc').textContent=el.value.length;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,80)+'px';}
 
-// ── ACCOUNTS ──────────────────────────────────────────────────────────────
-function renderAcc(filter='') {
+// ── ACCOUNTS ──
+function renderAcc(filter=''){
   const list=document.getElementById('al');
   const keys=Object.keys(bots).filter(k=>!filter||k.includes(filter.toLowerCase()));
   if(!keys.length){list.innerHTML='<div style="text-align:center;padding:30px;color:var(--tx3);font-size:12px">Нет аккаунтов</div>';return;}
   list.innerHTML='';
   keys.forEach(k=>{
-    const b=bots[k],color=bc(k),name=b.display||k;
+    const b=bots[k], color=bc(k), name=b.display||k;
     const dc=b.state==='connected'?'on':b.state==='connecting'||b.state==='reconnecting'?'cn':b.state==='error'?'err':'';
     const p=personas[k]||personas[name.toLowerCase()];
-    const pl=p?p.role:'не задана';
     const d=document.createElement('div');
     d.className='ait'+(b.sel?' sel':''); d.id='ai-'+k;
     d.innerHTML=`<div class="ava" style="background:${color}" onclick="togSel('${k}')">${name[0].toUpperCase()}</div>
       <div class="ain" onclick="togSel('${k}')">
         <div class="ain-n">${esc(name)}</div>
         <div class="ain-s" id="aisub-${k}">${b.state}</div>
-        <div class="ain-p" id="ainp-${k}">🧠 ${esc(pl)}</div>
+        <div class="ain-p" id="ainp-${k}">🧠 ${esc(p?p.role:'не задана')}</div>
+        <div class="ain-pres"><span class="sdot ${b.presence?'watch':''}" id="pdot-${k}" style="width:6px;height:6px"></span><span style="font-size:10px;color:${b.presence?'var(--yw)':'var(--tx3)'}"> ${b.presence?'смотрит стрим':'ожидание стрима'}</span></div>
       </div>
       <div class="air">
         <div style="display:flex;align-items:center;gap:4px">
@@ -602,12 +634,11 @@ function getTargets(){
   return conn;
 }
 
-// ── PERSONA ───────────────────────────────────────────────────────────────
-function openPersona(username) {
+// ── PERSONA ──
+function openPersona(username){
   editingPersonaUser=username;
   document.getElementById('pm-uname').textContent=username;
-  const k=username.toLowerCase();
-  const p=personas[k];
+  const k=username.toLowerCase(), p=personas[k];
   document.getElementById('pm-role').value=p?p.role:'';
   document.getElementById('pm-sys').value=p?p.sys:'';
   document.getElementById('pm-del-btn').style.display=p?'':'none';
@@ -621,32 +652,27 @@ function openPersona(username) {
 }
 function closePersona(){document.getElementById('persona-modal').classList.remove('open');editingPersonaUser=null;}
 function savePersona(){
-  const role=document.getElementById('pm-role').value.trim();
-  const sys=document.getElementById('pm-sys').value.trim();
+  const role=document.getElementById('pm-role').value.trim(), sys=document.getElementById('pm-sys').value.trim();
   if(!role||!sys)return toast('err','Заполни оба поля');
   socket.emit('set:persona',{username:editingPersonaUser,role,sys});
   personas[editingPersonaUser.toLowerCase()]={role,sys};
   renderAcc(); closePersona();
 }
 function deletePersona(){
-  if(!editingPersonaUser)return;
-  if(!confirm('Удалить личность для '+editingPersonaUser+'?'))return;
+  if(!editingPersonaUser||!confirm('Удалить?'))return;
   socket.emit('del:persona',{username:editingPersonaUser});
   delete personas[editingPersonaUser.toLowerCase()];
   renderAcc(); closePersona();
 }
 
-// ── PHRASES ───────────────────────────────────────────────────────────────
+// ── PHRASES ──
 function sendPhrase(g){
   const p=PG[g]; if(!p||!p.length)return;
   const txt=p[Math.floor(Math.random()*p.length)];
   const tgts=getTargets(); if(!tgts.length)return toast('err','Нет ботов');
   socket.emit('send:manual',{targets:tgts,message:txt});
 }
-function savePhrases(){
-  socket.emit('set:phrases',PG);
-  const ind=document.getElementById('pg-saved'); if(ind){ind.classList.add('show');setTimeout(()=>ind.classList.remove('show'),2000);}
-}
+function savePhrases(){socket.emit('set:phrases',PG);}
 function renderPhrases(){
   const bar=document.getElementById('pbar'); if(!bar)return; bar.innerHTML='';
   Object.keys(PG).forEach(g=>{
@@ -660,12 +686,12 @@ function renderPhrases(){
 function renderPGPage(){
   const grid=document.getElementById('pg-grid'); grid.innerHTML='';
   const keys=Object.keys(PG);
-  if(!keys.length){grid.innerHTML='<div style="color:var(--tx3);font-size:12px">Нет групп. Нажми + Добавить</div>';return;}
+  if(!keys.length){grid.innerHTML='<div style="color:var(--tx3);font-size:12px">Нет групп</div>';return;}
   keys.forEach(g=>{
     const card=document.createElement('div'); card.className='pg-card';
     card.innerHTML=`<div class="pg-name">${esc(g)}</div>
       <div class="pg-list">${PG[g].map(p=>'· '+esc(p)).join('<br>')}</div>
-      <div class="pg-btns"><button class="pg-btn" onclick="openEditPG('${esc(g)}')">✎ Изменить</button><button class="pg-del" onclick="deletePGd('${esc(g)}')">✕</button></div>`;
+      <div class="pg-btns"><button class="pg-btn" onclick="openEditPG('${esc(g)}')">✎</button><button class="pg-del" onclick="deletePGd('${esc(g)}')">✕</button></div>`;
     grid.appendChild(card);
   });
 }
@@ -676,47 +702,57 @@ function savePG(){
   const name=document.getElementById('pn').value.trim(),texts=document.getElementById('pt').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!name)return toast('err','Введи название');if(!texts.length)return toast('err','Добавь фразы');
   if(editingGroup&&editingGroup!==name)delete PG[editingGroup];
-  PG[name]=texts; savePhrases(); renderPhrases(); renderPGPage(); closePM();
-  toast('ok','✅ "'+name+'" сохранено');
+  PG[name]=texts;savePhrases();renderPhrases();renderPGPage();closePM();toast('ok','✅ "'+name+'" сохранено');
 }
-function deletePG(){if(!editingGroup)return;if(!confirm('Удалить?'))return;delete PG[editingGroup];editingGroup=null;savePhrases();renderPhrases();renderPGPage();closePM();}
-function deletePGd(g){if(!confirm('Удалить "'+g+'"?'))return;delete PG[g];savePhrases();renderPhrases();renderPGPage();}
+function deletePG(){if(!editingGroup||!confirm('Удалить?'))return;delete PG[editingGroup];editingGroup=null;savePhrases();renderPhrases();renderPGPage();closePM();}
+function deletePGd(g){if(!confirm('Удалить?'))return;delete PG[g];savePhrases();renderPhrases();renderPGPage();}
 
-// ── TRANSCRIPT ─────────────────────────────────────────────────────────────
+// ── TRANSCRIPT PAGE ──
+function renderTranscriptPage(){
+  const body=document.getElementById('tr-body'); body.innerHTML='';
+  if(!transcriptSessions.length){
+    body.innerHTML='<div style="text-align:center;padding:40px;color:var(--tx3);font-size:12px">Ожидание транскрипции... Стрим должен идти.</div>';
+    return;
+  }
+  transcriptSessions.forEach(sess=>{
+    const block=document.createElement('div'); block.className='tr-block';
+    const t=new Date(sess.timestamp).toTimeString().slice(0,8);
+    let responsesHtml='';
+    if(sess.responses.length){
+      responsesHtml=sess.responses.map(r=>{
+        const color=bc(r.username.toLowerCase());
+        return `<div class="tr-resp">
+          <div class="tr-resp-name" style="color:${color}">${esc(r.username)}<br><span style="font-size:9px;color:var(--tx3)">${esc(r.persona)}</span></div>
+          <div class="tr-resp-msg">${esc(r.message)}</div>
+          <div class="tr-resp-meta">${new Date(r.timestamp).toTimeString().slice(0,8)}</div>
+        </div>`;
+      }).join('');
+    } else {
+      responsesHtml='<div style="font-size:11px;color:var(--tx3);padding:6px 0;font-style:italic">Боты ещё не ответили...</div>';
+    }
+    block.innerHTML=`<div class="tr-heard"><div class="tr-heard-label">🎙 ${t} — Groq Whisper услышал:</div><div class="tr-heard-text">${esc(sess.heard)}</div></div><div class="tr-responses">${responsesHtml}</div>`;
+    body.appendChild(block);
+  });
+}
 async function loadTranscript(){
-  const body=document.getElementById('tr-body');
-  body.innerHTML='<div style="text-align:center;padding:20px;color:var(--tx3)">Загрузка...</div>';
+  // Also try to fetch from server for older entries
   try{
-    const r=await fetch('/api/transcript'),data=await r.json();
-    if(!data.length){body.innerHTML='<div style="text-align:center;padding:40px;color:var(--tx3);font-size:12px">Нет записей. Дождись пока боты напишут.</div>';return;}
-    body.innerHTML='';
-    [...data].reverse().forEach(e=>{
-      const d=document.createElement('div');d.className='tr-entry';
-      const t=new Date(e.timestamp).toTimeString().slice(0,8);
-      d.innerHTML=`<div class="tr-time">${t}</div>
-        <div><div class="tr-n" style="color:${bc(e.username.toLowerCase())}">${esc(e.username)}</div>
-        <div class="tr-m">${esc(e.message)}</div>
-        <div class="tr-r"><span class="tr-p">${esc(e.persona)}</span>${esc(e.trigger)}</div></div>`;
-      body.appendChild(d);
-    });
-  }catch(e){body.innerHTML='<div style="color:var(--rd);padding:20px">Ошибка: '+e.message+'</div>';}
+    const r=await fetch('/api/transcript'); const data=await r.json();
+    if(data.length){
+      // Merge server data into sessions
+      const grouped=new Map();
+      data.forEach(e=>{
+        const key=e.heard+(Math.floor(e.timestamp/60000)); // group by minute+heard
+        if(!grouped.has(key)) grouped.set(key,{heard:e.heard,timestamp:e.timestamp,responses:[]});
+        grouped.get(key).responses.push({username:e.username,message:e.message,persona:e.persona,timestamp:e.timestamp});
+      });
+      transcriptSessions=[...grouped.values()].sort((a,b)=>b.timestamp-a.timestamp);
+    }
+  }catch{/* ignore */}
+  renderTranscriptPage();
 }
 
-// ── TABS ───────────────────────────────────────────────────────────────────
-function switchTab(tab,btn){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
-  if(btn&&btn.classList)btn.classList.add('on');
-  const pl=document.getElementById('panel-left'),pc=document.getElementById('panel-center');
-  const pr=document.getElementById('panel-right');
-  const pp=document.getElementById('phrase-page'),tp=document.getElementById('transcript-page');
-  pl.style.display='';pc.style.display='';pr.style.display='';pr.style.width='';
-  pp.style.display='none';tp.style.display='none';
-  if(tab==='accounts'){pl.style.display='none';pc.style.display='none';pr.style.width='100%';}
-  else if(tab==='phrases'){pl.style.display='none';pc.style.display='none';pr.style.display='none';pp.style.display='flex';renderPGPage();}
-  else if(tab==='transcript'){pl.style.display='none';pc.style.display='none';pr.style.display='none';tp.style.display='flex';loadTranscript();}
-}
-
-// ── ERRORS / UPTIME ────────────────────────────────────────────────────────
+// ── ERRORS / UPTIME ──
 function toggleErr(){const s=document.getElementById('estrip');s.style.display=s.style.display==='none'?'':'none';}
 function toggleEL(){document.getElementById('elist').classList.toggle('open');}
 function startUptime(){
@@ -730,6 +766,20 @@ function startUptime(){
   },1000);
 }
 
+// ── TABS ──
+function switchTab(tab,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  if(btn&&btn.classList)btn.classList.add('on');
+  const pl=document.getElementById('panel-left'),pc=document.getElementById('panel-center');
+  const pr=document.getElementById('panel-right');
+  const pp=document.getElementById('phrase-page'),tp=document.getElementById('transcript-page');
+  pl.style.display='';pc.style.display='';pr.style.display='';pr.style.width='';
+  pp.style.display='none';tp.style.display='none';
+  if(tab==='accounts'){pl.style.display='none';pc.style.display='none';pr.style.width='100%';}
+  else if(tab==='phrases'){pl.style.display='none';pc.style.display='none';pr.style.display='none';pp.style.display='flex';renderPGPage();}
+  else if(tab==='transcript'){pl.style.display='none';pc.style.display='none';pr.style.display='none';tp.style.display='flex';renderTranscriptPage();}
+}
+
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(type,msg){
   const w=document.getElementById('toasts');
@@ -738,9 +788,8 @@ function toast(type,msg){
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .25s';setTimeout(()=>t.remove(),250);},4500);
 }
 
-// Init default phrases if server has none
 if(!Object.keys(PG).length){
-  PG={'ахахха':['ахахаха','KEKW','хахаха','лол','LUL'],'приветствие':['привет!','здарова чат','хай!'],'оски':['оски?','Pog','PogChamp','👀'],'gg':['GG','gg wp','красавчик'],'хайп':["LET'S GO!","давай!","🔥"]};
+  PG={'ахахха':['ахахаха','KEKW','хахаха','лол'],'приветствие':['привет!','здарова чат','хай!'],'оски':['оски?','Pog','👀'],'gg':['GG','gg wp','красавчик'],'хайп':["LET'S GO!","давай!","🔥"]};
 }
 renderPhrases();
 </script>
