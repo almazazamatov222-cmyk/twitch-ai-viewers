@@ -13,8 +13,13 @@ const app = express();
 const http = createServer(app);
 const io = new Server(http, { cors: { origin: '*' } });
 app.use(express.json());
+const FE_DIST = path.join(__dirname, '../frontend/dist');
 app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(FE_DIST));
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(FE_DIST, 'index.html'));
+});
 const PORT = process.env.PORT || 3000;
 
 // ── Persistent storage ──────────────────────────────────────────────────────

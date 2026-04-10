@@ -1,12 +1,13 @@
 {
-  "name": "twitch-ai-viewers",
+  "name": "boostex",
   "version": "1.0.0",
-  "description": "TwitchBoost AI Chat Bots",
+  "description": "Boostex - AI Chat Bots for Twitch",
   "main": "src/main.ts",
   "type": "commonjs",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "build": "tsc",
+    "build": "tsc && npm run build:fe",
+    "build:fe": "cd frontend && npm install && npm run build",
     "start": "node dist/main.js",
     "postinstall": "pip install streamlink --break-system-packages || pip3 install streamlink --break-system-packages || true"
   },
