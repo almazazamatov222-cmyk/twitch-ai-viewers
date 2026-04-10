@@ -15,7 +15,6 @@ const io = new Server(http, { cors: { origin: '*' } });
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 app.get('/health', (_req, res) => res.json({ ok: true }));
-
 const PORT = process.env.PORT || 3000;
 
 // ── Persistent storage ──────────────────────────────────────────────────────
@@ -36,13 +35,12 @@ interface SavedConfig {
 }
 
 function loadSaved(): SavedConfig {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-  } catch (e: any) { console.warn('[config] load error:', e.message); }
+  try { if (fs.existsSync(CONFIG_FILE)) return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8')); }
+  catch (e: any) { console.warn('[config] load error:', e.message); }
   return { personas: {}, phraseGroups: {} };
 }
 function saveToDisk(data: SavedConfig): void {
-  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2)); console.log('[config] saved'); }
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2)); }
   catch (e: any) { console.error('[config] save error:', e.message); }
 }
 
@@ -53,13 +51,11 @@ function extractChannel(raw: string): string {
     .replace(/twitch\.tv\//g, '').replace(/^#/, '').replace(/\/$/, '')
     .trim().toLowerCase();
 }
-
 function readEnvConfig() {
   const channel = extractChannel(process.env.TWITCH_CHANNEL || '');
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
   const language = (process.env.ORIGINAL_STREAM_LANGUAGE || 'ru').trim();
   const context = (process.env.STREAM_CONTEXT || '').trim();
-
   const bots: { username: string; token: string }[] = [];
   for (let i = 1; i <= 50; i++) {
     const u = process.env['BOT' + i + '_USERNAME']?.trim();
@@ -80,17 +76,20 @@ async function getAppToken(): Promise<string | null> {
     return r.data.access_token as string;
   } catch { return null; }
 }
-async function getStreamData(channel: string) {
+async function getStreamData(channel: string): Promise<{ live: boolean; viewers?: number; game?: string; userId?: string }> {
   const cid = process.env.TWITCH_CLIENT_ID?.trim();
   if (!cid || !channel) return { live: false };
   if (!appToken) appToken = await getAppToken();
   if (!appToken) return { live: false };
   try {
-    const sRes = await axios.get('https://api.twitch.tv/helix/streams',
-      { params: { user_login: channel }, headers: { 'Client-ID': cid, Authorization: 'Bearer ' + appToken } });
+    const [uRes, sRes] = await Promise.all([
+      axios.get('https://api.twitch.tv/helix/users', { params: { login: channel }, headers: { 'Client-ID': cid, Authorization: 'Bearer ' + appToken } }),
+      axios.get('https://api.twitch.tv/helix/streams', { params: { user_login: channel }, headers: { 'Client-ID': cid, Authorization: 'Bearer ' + appToken } }),
+    ]);
+    const userId = uRes.data.data?.[0]?.id as string | undefined;
     const s = sRes.data.data?.[0];
-    if (s) return { live: true, viewers: s.viewer_count as number, game: s.game_name as string, title: s.title as string };
-    return { live: false };
+    if (s) return { live: true, viewers: s.viewer_count, game: s.game_name, userId };
+    return { live: false, userId };
   } catch (e: any) {
     if (e.response?.status === 401) appToken = null;
     return { live: false };
@@ -104,6 +103,7 @@ let streamPoll: NodeJS.Timeout | null = null;
 let startedBots: string[] = [];
 let isStarted = false;
 let saved = loadSaved();
+let channelId: string | null = null;
 console.log('[config] personas:', Object.keys(saved.personas).join(', ') || 'none');
 
 // ── REST ────────────────────────────────────────────────────────────────────
@@ -111,9 +111,11 @@ app.get('/api/transcript', (_req, res) => res.json(manager?.getTranscriptLog()?.
 app.get('/api/personas',   (_req, res) => res.json(saved.personas));
 app.get('/api/phrases',    (_req, res) => res.json(saved.phraseGroups));
 app.get('/api/presence',   (_req, res) => res.json(manager?.getPresenceStatus() || {}));
-app.get('/api/status',     (_req, res) => {
-  const cfg = readEnvConfig();
-  res.json({ channel: cfg.channel, bots: cfg.bots.map(b => b.username), started: isStarted });
+app.get('/api/points',     (_req, res) => res.json(manager?.getPointsBalances() || {}));
+app.post('/api/claim-points', async (_req, res) => {
+  if (!manager) return res.json({ error: 'Боты не запущены' });
+  await manager.claimAllBonusChests();
+  res.json({ ok: true });
 });
 
 // ── Socket.IO ───────────────────────────────────────────────────────────────
@@ -123,46 +125,44 @@ io.on('connection', socket => {
   socket.emit('config', { channel: cfg.channel, botsPerTranscript: saved.botsPerTranscript || 2 });
   socket.emit('personas:update', saved.personas);
   socket.emit('phrases:update', saved.phraseGroups);
-
   if (isStarted && startedBots.length > 0) {
     socket.emit('bots:started', { bots: startedBots });
     startedBots.forEach(u => socket.emit('bot:status', { username: u, state: 'connected', message: 'Подключён' }));
-    if (manager) socket.emit('presence:update', manager.getPresenceStatus());
+    if (manager) {
+      socket.emit('presence:update', manager.getPresenceStatus());
+      socket.emit('points:all', manager.getPointsBalances());
+    }
   }
 
   socket.on('send:manual', async (data: { targets: string[]; message: string }) => {
-    if (manager && data.targets?.length && data.message)
-      await manager.sendManual(data.targets, data.message);
+    if (manager && data.targets?.length && data.message) await manager.sendManual(data.targets, data.message);
   });
-
   socket.on('set:persona', (data: { username: string; role: string; sys: string }) => {
-    const k = data.username.toLowerCase();
-    const cfg2: PersonaConfig = { role: data.role, sys: data.sys };
-    saved.personas[k] = cfg2;
-    saveToDisk(saved);
+    const k = data.username.toLowerCase(), cfg2: PersonaConfig = { role: data.role, sys: data.sys };
+    saved.personas[k] = cfg2; saveToDisk(saved);
     if (manager) manager.setPersona(data.username, cfg2);
     io.emit('personas:update', saved.personas);
     socket.emit('persona:saved', { username: data.username, ok: true });
   });
   socket.on('del:persona', (data: { username: string }) => {
-    delete saved.personas[data.username.toLowerCase()];
-    saveToDisk(saved);
+    delete saved.personas[data.username.toLowerCase()]; saveToDisk(saved);
     io.emit('personas:update', saved.personas);
   });
   socket.on('set:phrases', (data: Record<string, string[]>) => {
-    saved.phraseGroups = data;
-    saveToDisk(saved);
-    io.emit('phrases:update', saved.phraseGroups);
+    saved.phraseGroups = data; saveToDisk(saved); io.emit('phrases:update', saved.phraseGroups);
   });
   socket.on('set:bots_per_transcript', (data: { n: number }) => {
     const n = Math.max(1, parseInt(String(data.n)) || 2);
-    saved.botsPerTranscript = n;
-    saveToDisk(saved);
+    saved.botsPerTranscript = n; saveToDisk(saved);
     if (manager) manager.setBotsPerTranscript(n);
     io.emit('config', { botsPerTranscript: n });
   });
   socket.on('get:personas', () => socket.emit('personas:update', saved.personas));
   socket.on('get:phrases',  () => socket.emit('phrases:update', saved.phraseGroups));
+  socket.on('claim:points', async () => {
+    if (manager) await manager.claimAllBonusChests();
+    socket.emit('points:claimed_all', { ok: true });
+  });
   socket.on('disconnect', () => console.log('[server] disconnected', socket.id));
 });
 
@@ -170,31 +170,30 @@ io.on('connection', socket => {
 async function autoStart(): Promise<void> {
   const cfg = readEnvConfig();
   console.log('[server] channel="' + cfg.channel + '" bots=' + cfg.bots.length + ' groq=' + (cfg.groqKey ? 'OK' : 'MISSING'));
-
-  if (!cfg.channel || !cfg.groqKey || !cfg.bots.length) {
-    console.warn('[server] missing config');
-    return;
-  }
+  if (!cfg.channel || !cfg.groqKey || !cfg.bots.length) { console.warn('[server] missing config'); return; }
 
   if (manager) { await manager.stop(); manager = null; }
   if (transcriber) { transcriber.stop(); transcriber = null; }
   await new Promise(r => setTimeout(r, 1500));
 
+  const info = await getStreamData(cfg.channel);
+  channelId = (info as any).userId || null;
+  console.log('[server] channelId=' + channelId + ' live=' + info.live);
+
   manager = new BotManager(
     cfg.bots, cfg.channel, cfg.groqKey,
     {
-      language: cfg.language,
-      context: cfg.context,
+      language: cfg.language, context: cfg.context,
       settings: { useEmoji: true, chatContext: true },
       savedPersonas: saved.personas,
       botsPerTranscript: saved.botsPerTranscript || 2,
+      channelId: channelId || undefined,
+      clientId: process.env.TWITCH_CLIENT_ID?.trim(),
     },
     (event, data) => {
       io.emit(event, data);
-      // When presence changes, push full status update
-      if (event === 'presence:active' && manager) {
-        io.emit('presence:update', manager.getPresenceStatus());
-      }
+      if (event === 'presence:active' && manager) io.emit('presence:update', manager.getPresenceStatus());
+      if (event === 'points:balance') io.emit('points:all', manager?.getPointsBalances() || {});
     }
   );
 
@@ -203,24 +202,20 @@ async function autoStart(): Promise<void> {
   io.emit('bots:started', { bots: startedBots });
   console.log('[server] started', startedBots.length, 'bots');
 
-  // ── Start transcription ──────────────────────────────────────────────────
+  // Start transcription
   transcriber = new TranscriptionService(cfg.groqKey, cfg.channel);
   transcriber.start((result) => {
-    console.log('[transcription] TEXT:', result.text.slice(0, 80));
-    // Broadcast to UI
+    console.log('[transcription] TEXT:', result.text.slice(0, 100));
     io.emit('transcription:new', { text: result.text, timestamp: result.timestamp });
-    // Tell bots to respond
     if (manager) manager.onTranscription(result.text);
   });
-  console.log('[server] transcription service started');
 
-  // ── Stream info ──────────────────────────────────────────────────────────
-  const info = await getStreamData(cfg.channel);
   io.emit('stream:info', { live: info.live, game: (info as any).game, viewers: (info as any).viewers });
 
   if (streamPoll) clearInterval(streamPoll);
   streamPoll = setInterval(async () => {
     const si = await getStreamData(cfg.channel);
+    if ((si as any).userId && !channelId) channelId = (si as any).userId;
     io.emit('stream:info', { live: si.live, game: (si as any).game, viewers: (si as any).viewers });
     if ((si as any).viewers != null) io.emit('stream:viewers', { viewers: (si as any).viewers });
   }, 30000);
@@ -230,7 +225,6 @@ http.listen(PORT, () => {
   console.log('\nTwitchBoost at http://localhost:' + PORT + '\n');
   setTimeout(autoStart, 1500);
 });
-
 process.on('SIGTERM', async () => {
   if (streamPoll) clearInterval(streamPoll);
   if (transcriber) transcriber.stop();
