@@ -76,15 +76,23 @@ async function getAppToken(): Promise<string | null> {
   const cid = process.env.TWITCH_CLIENT_ID?.trim(), cs = process.env.TWITCH_CLIENT_SECRET?.trim();
   if (!cid || !cs) return null;
   try {
-    const r = await axios.post('https://id.twitch.tv/oauth2/token', null,
-      { params: { client_id: cid, client_secret: cs, grant_type: 'client_credentials' } });
+    const r = await axios.post('https://id.twitch.tv/oauth2/token?' + 
+      new URLSearchParams({ client_id: cid, client_secret: cs, grant_type: 'client_credentials' }).toString());
+    console.log('[helix] token response:', r.data);
     return r.data.access_token as string;
-  } catch { return null; }
+  } catch (e: any) { 
+    console.error('[helix] token error:', e.message);
+    return null; 
+  }
 }
 async function getStreamData(channel: string): Promise<{ live: boolean; viewers?: number; game?: string; userId?: string }> {
   const cid = process.env.TWITCH_CLIENT_ID?.trim();
   if (!cid || !channel) return { live: false };
-  if (!appToken) appToken = await getAppToken();
+  if (!appToken) {
+    console.log('[helix] getting app token...');
+    appToken = await getAppToken();
+    console.log('[helix] got app token:', appToken ? 'OK' : 'FAILED');
+  }
   if (!appToken) return { live: false };
   try {
     const [uRes, sRes] = await Promise.all([
@@ -93,7 +101,11 @@ async function getStreamData(channel: string): Promise<{ live: boolean; viewers?
     ]);
     const userId = uRes.data.data?.[0]?.id as string | undefined;
     const s = sRes.data.data?.[0];
-    if (s) return { live: true, viewers: s.viewer_count, game: s.game_name, userId };
+    if (s) {
+      console.log('[helix] stream live, viewers:', s.viewer_count, 'game:', s.game_name);
+      return { live: true, viewers: s.viewer_count, game: s.game_name, userId };
+    }
+    console.log('[helix] stream NOT live');
     return { live: false, userId };
   } catch (e: any) {
     if (e.response?.status === 401) appToken = null;
