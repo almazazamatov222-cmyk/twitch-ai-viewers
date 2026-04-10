@@ -111,10 +111,20 @@ export class TranscriptionService {
 
   private captureAudio(outputFile: string): Promise<boolean> {
     return new Promise((resolve) => {
+      // Find streamlink in nix store
+      const { execSync } = require('child_process');
+      let streamlinkPath = 'streamlink';
+      try {
+        const path = execSync('which streamlink 2>/dev/null || find /nix/store -name streamlink -type f 2>/dev/null | head -1', { encoding: 'utf8' }).trim();
+        if (path && !path.includes('which')) {
+          streamlinkPath = path;
+          console.log('[transcription] Found streamlink:', streamlinkPath);
+        }
+      } catch {}
       const streamUrl = `https://twitch.tv/${this.channel}`;
       console.log('[transcription] Capturing audio from', streamUrl, 'for', this.chunkDuration, 's...');
 
-      const streamlink = spawn('streamlink', [
+      const streamlink = spawn(streamlinkPath, [
         '--quiet',
         '--twitch-low-latency',
         streamUrl,
