@@ -18,6 +18,14 @@ const FE_DIST = path.join(__dirname, '../frontend/dist');
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.static(FE_DIST));
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/debug', (_req, res) => {
+  res.json({
+    hasGitHubToken: !!GITHUB_TOKEN,
+    hasGistId: !!MARKOV_GIST_ID,
+    gistId: MARKOV_GIST_ID || 'not set',
+    learnBotExists: !!learnBot,
+  });
+});
 app.get('/api/learn', (_req, res) => {
   if (learnBot) {
     res.json(learnBot.getData());
@@ -196,11 +204,16 @@ async function saveToGitHub(data: any): Promise<boolean> {
         public: false,
         files: { 'markov-chain.json': { content: json } },
       }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
-      console.log('[github] Created new gist:', r.data.id);
+      const newId = r.data.id;
+      console.log('[github] Created new gist:', newId);
+      // Save gist ID to local file for future use
+      try {
+        fs.writeFileSync(path.join(DATA_DIR, 'gist-id.txt'), newId);
+      } catch {}
       return true;
     } else {
       // Update existing gist
-      const r = await axios.patch(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
+      await axios.patch(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
         files: { 'markov-chain.json': { content: json } },
       }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
       console.log('[github] Updated gist');
@@ -578,6 +591,13 @@ async function autoStart(): Promise<void> {
 
 http.listen(PORT, () => {
   console.log('\nTwitchBoost at http://localhost:' + PORT + '\n');
+  
+  if (GITHUB_TOKEN && MARKOV_GIST_ID) {
+    console.log('[github] ✓ GitHub configured');
+  } else {
+    console.log('[github] ✗ GITHUB_TOKEN or MARKOV_GIST_ID not set');
+  }
+  
   setTimeout(autoStart, 1500);
 });
 process.on('SIGTERM', async () => {
