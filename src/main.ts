@@ -378,9 +378,11 @@ async function saveLearnData(): Promise<void> {
   }
   
   // Save to GitHub
-  console.log('[github] saveToGitHub check - token:', !!GITHUB_TOKEN, 'gistId:', !!MARKOV_GIST_ID);
+  console.log('[github] saveToGitHub check - token:', !!GITHUB_TOKEN, 'gistId:', !!MARKOV_GIST_ID, 'data msgs:', data.messages);
   if (GITHUB_TOKEN && MARKOV_GIST_ID) {
+    console.log('[github] Calling saveToGitHub...');
     const ok = await saveToGitHub(data);
+    console.log('[github] saveToGitHub result:', ok);
     if (ok) {
       io.emit('learn:log', '✅ Сохранено в GitHub Gist');
     } else {
