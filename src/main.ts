@@ -160,7 +160,57 @@ function readLearnConfig() {
   };
 }
 
-// ── Helix ───────────────────────────────────────────────────────────────────
+// ── GitHub Gist for Markov data ───────────────────────────────────────────────
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN?.trim();
+const MARKOV_GIST_ID = process.env.MARKOV_GIST_ID?.trim();
+
+async function loadFromGitHub(): Promise<any | null> {
+  if (!GITHUB_TOKEN || !MARKOV_GIST_ID) {
+    console.log('[github] No GITHUB_TOKEN or MARKOV_GIST_ID configured');
+    return null;
+  }
+  try {
+    const r = await axios.get(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
+      headers: { Authorization: 'token ' + GITHUB_TOKEN },
+    });
+    const files = r.data.files;
+    const keys = Object.keys(files);
+    if (keys.length === 0) return null;
+    const content = files[keys[0]].content;
+    console.log('[github] Loaded Markov data from gist');
+    return JSON.parse(content);
+  } catch (e: any) {
+    console.log('[github] Could not load:', e.message);
+    return null;
+  }
+}
+
+async function saveToGitHub(data: any): Promise<boolean> {
+  if (!GITHUB_TOKEN || !MARKOV_GIST_ID) return false;
+  try {
+    const json = JSON.stringify(data, null, 2);
+    if (MARKOV_GIST_ID === 'auto') {
+      // Create new gist
+      const r = await axios.post('https://api.github.com/gists', {
+        description: 'TwitchBoost Markov Chain',
+        public: false,
+        files: { 'markov-chain.json': { content: json } },
+      }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
+      console.log('[github] Created new gist:', r.data.id);
+      return true;
+    } else {
+      // Update existing gist
+      const r = await axios.patch(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
+        files: { 'markov-chain.json': { content: json } },
+      }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
+      console.log('[github] Updated gist');
+      return true;
+    }
+  } catch (e: any) {
+    console.log('[github] Save error:', e.message);
+    return false;
+  }
+}
 let appToken: string | null = null;
 async function getAppToken(): Promise<string | null> {
   const cid = process.env.TWITCH_CLIENT_ID?.trim(), cs = process.env.TWITCH_CLIENT_SECRET?.trim();
@@ -220,7 +270,20 @@ function getLearnDataPath(): string {
   return path.join(DATA_DIR, 'markov-chain.json');
 }
 
-function loadLearnData(): any {
+async function loadLearnData(): Promise<any> {
+  // Try GitHub first
+  if (GITHUB_TOKEN) {
+    const githubData = await loadFromGitHub();
+    if (githubData) {
+      console.log('[learn] Loaded from GitHub:', githubData.messages || 0, 'messages');
+      // Also save locally as backup
+      try {
+        fs.writeFileSync(getLearnDataPath(), JSON.stringify(githubData, null, 2));
+      } catch {}
+      return githubData;
+    }
+  }
+  // Fallback to local file
   const p = getLearnDataPath();
   try {
     if (fs.existsSync(p)) {
@@ -234,15 +297,25 @@ function loadLearnData(): any {
   return null;
 }
 
-function saveLearnData(): void {
+async function saveLearnData(): Promise<void> {
   if (!learnBot) return;
+  const data = learnBot.getData();
+  
+  // Save locally as backup
   const p = getLearnDataPath();
   try {
-    const data = learnBot.getData();
     fs.writeFileSync(p, JSON.stringify(data, null, 2));
-    console.log('[learn] Saved', data.messages, 'messages to', p);
+    console.log('[learn] Saved locally to', p);
   } catch (e: any) {
-    console.log('[learn] Could not save:', e.message);
+    console.log('[learn] Local save error:', e.message);
+  }
+  
+  // Save to GitHub
+  if (GITHUB_TOKEN) {
+    const ok = await saveToGitHub(data);
+    if (ok) {
+      io.emit('learn:log', '✅ Сохранено в GitHub Gist');
+    }
   }
 }
 
@@ -325,7 +398,7 @@ io.on('connection', socket => {
     learnBot = new LearnBot((e, d) => io.emit(e, d));
     
     // Load saved data if exists
-    const savedData = loadLearnData();
+    const savedData = await loadLearnData();
     if (savedData) {
       learnBot.loadData(savedData);
       io.emit('learn:log', 'Загружено ' + savedData.messages + ' сохранённых сообщений');
@@ -410,7 +483,7 @@ async function autoStart(): Promise<void> {
     if (!learnBot) {
       learnBot = new LearnBot((e, d) => io.emit(e, d));
     }
-    const savedData = loadLearnData();
+    const savedData = await loadLearnData();
     if (savedData) {
       learnBot.loadData(savedData);
       console.log('[server] Loaded learn data:', savedData.messages, 'messages');
