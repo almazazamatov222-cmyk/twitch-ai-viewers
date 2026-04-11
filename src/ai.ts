@@ -140,10 +140,9 @@ export class AIService {
     console.log('[ai] Generating for:', username, 'key:', k, 'has custom:', !!custom, 'sys:', custom?.sys?.slice(0, 30));
     const lang = custom ? '' : (language === 'ru' ? 'Russian' : language === 'kk' ? 'Kazakh' : 'English');
 
-    const chatCtx = this.realChatSamples.length >= 3
-      ? '\nRecent real viewer messages (match their style):\n' + this.realChatSamples.slice(-6).join('\n')
-      : '';
-
+// Only respond to transcription, not chat
+    // No context from real chat
+    
     let system: string;
     let userPrompt: string;
 
@@ -154,7 +153,7 @@ export class AIService {
     } else {
       system = [
         custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. Short reactions.`,
-        `The streamer said: "${transcribedText}"` + (chatCtx ? '\n' + chatCtx : ''),
+        `The streamer said: "${transcribedText}"`,
         'Complete sentence, 1-6 words. Max 30 chars total.',
       ].filter(Boolean).join('\n');
       userPrompt = 'React to what the streamer just said.';
