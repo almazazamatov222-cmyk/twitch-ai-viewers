@@ -69,7 +69,25 @@ export class BotManager {
 
   async onTranscription(text: string): Promise<void> {
     if (this.stopped || !text.trim()) return;
-    // Skip some transcriptions randomly to make it more natural
+    
+    // Check if any bot was mentioned by name
+    const textLower = text.toLowerCase();
+    for (const [name, bot] of this.bots) {
+      if (bot.connected && textLower.includes(name.toLowerCase())) {
+        console.log('[bot] Bot mentioned:', name);
+        setTimeout(async () => {
+          if (!this.stopped && bot.connected && Date.now() - bot.lastMsgTime > 3000) {
+            const msg = await this.ai.generateFromTranscription(bot.username, text, this.language, bot.index);
+            if (msg && !this.stopped) {
+              await bot.client.say('#' + this.channel, msg);
+              console.log('[bot] Responded to mention:', name, msg);
+            }
+          }
+        }, 1000 + Math.random() * 2000);
+      }
+    }
+    
+    // Skip some transcriptions for variety
     if (Math.random() < 0.2) {
       console.log('[bot] Skipping transcription (random)');
       return;
@@ -139,7 +157,7 @@ if (Date.now() - bot.lastMsgTime < 5000) return;
         message, color: tags.color || null, isBot: isBotAccount, id: tags.id || String(Date.now()),
       });
       if (!isBotAccount) {
-        // chat reading disabled - only transcription
+        this.ai.addRealMessage(tags['display-name'] || tags.username || 'viewer', message);
         for (const [botKey, bot] of this.bots) {
           if (!bot.connected) continue;
           if (message.toLowerCase().includes('@' + botKey) || message.toLowerCase().includes('@' + bot.username.toLowerCase())) {
