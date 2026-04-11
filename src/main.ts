@@ -198,7 +198,7 @@ async function loadFromGitHub(): Promise<any | null> {
   
   try {
     const r = await axios.get(`https://api.github.com/gists/${gistId}`, {
-      headers: { Authorization: 'token ' + GITHUB_TOKEN },
+      headers: { Authorization: 'Bearer ' + GITHUB_TOKEN },
     });
     const files = r.data.files;
     const keys = Object.keys(files);
@@ -207,7 +207,7 @@ async function loadFromGitHub(): Promise<any | null> {
     console.log('[github] Loaded Markov data from gist');
     return JSON.parse(content);
   } catch (e: any) {
-    console.log('[github] Could not load:', e.message);
+    console.log('[github] Could not load:', e.message, e.response?.status);
     return null;
   }
 }
@@ -236,7 +236,7 @@ async function saveToGitHub(data: any): Promise<boolean> {
         description: 'TwitchBoost Markov Chain',
         public: false,
         files: { 'markov-chain.json': { content: json } },
-      }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
+      }, { headers: { Authorization: 'Bearer ' + GITHUB_TOKEN } });
       const newId = r.data.id;
       console.log('[github] Created new gist:', newId);
       // Save gist ID to local file
@@ -246,12 +246,22 @@ async function saveToGitHub(data: any): Promise<boolean> {
       return true;
     } else {
       // Update existing gist
-      console.log('[github] Patching gist:', gistId, 'data size:', json.length);
-      const r = await axios.patch(`https://api.github.com/gists/${gistId}`, {
-        files: { 'markov-chain.json': { content: json } },
-      }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
-      console.log('[github] Updated gist, response:', r.status);
-      return true;
+      console.log('[github] Patching gist:', gistId, 'data size:', json.length, 'token len:', GITHUB_TOKEN?.length);
+      try {
+        const r = await axios.patch(`https://api.github.com/gists/${gistId}`, {
+          files: { 'markov-chain.json': { content: json } },
+        }, { 
+          headers: { 
+            Authorization: 'Bearer ' + GITHUB_TOKEN,
+            'Content-Type': 'application/json',
+          } 
+        });
+        console.log('[github] Updated gist, response:', r.status);
+        return true;
+      } catch (e: any) {
+        console.log('[github] Patch error:', e.message, e.response?.status);
+        return false;
+      }
     }
   } catch (e: any) {
     console.log('[github] Save error:', e.message);
