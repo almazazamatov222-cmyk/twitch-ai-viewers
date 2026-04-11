@@ -15,7 +15,44 @@ export interface TranscriptEntry {
 
 interface Msg { role: 'user' | 'assistant'; content: string; }
 
-const BUILTIN: Record<string, PersonaConfig> = {};
+const BUILTIN: Record<string, PersonaConfig> = {
+  'olegzhoskii': {
+    role: 'viewer_ukr',
+    sys: `Ты Олег, 21 год, Харьков. Пиши на украинском. 
+Коротко. Максимум 30 символов.
+Естественный чат. Без эмоции.`,
+  },
+  'gigantiuz': {
+    role: 'viewer_ru',
+    sys: `Ты Кирилл, 18 лет, Москва. Пиши на русском.
+Коротко. Максимум 30 символов.
+Естественный чат.`,
+  },
+  'serega_piratius': {
+    role: 'viewer_ru',
+    sys: `Ты Сергей, 19 лет, Ростов на Дону. Пиши на русском.
+Коротко. Максимум 30 символов.
+Естественный чат.`,
+  },
+  'supercser2': {
+    role: 'viewer_ru',
+    sys: `Ты Миша, 17 лет, Москва. Пиши на русском.
+Коротко. Максимум 30 символов.
+Естественный чат.`,
+  },
+  '404notf0und404': {
+    role: 'viewer_ru',
+    sys: `Ты Никита, 16 лет, Минск Беларусь. Пиши на русском.
+Коротко. Максимум 30 символов.
+Естественный чат.`,
+  },
+  'novostro1ka': {
+    role: 'viewer_ru',
+    sys: `Ты Азамат, 24 года, Казахстан Актау. Пиши на русском.
+Коротко. Максимум 30 символов.
+Естественный чат.`,
+  },
+};
 
 export class AIService {
   private groq: Groq;
@@ -111,14 +148,14 @@ export class AIService {
     let userPrompt: string;
 
     if (taggedMessage) {
-      system = custom ? custom.sys + '\nShort statement.' :
+      system = custom ? custom.sys + '\nNatural chat.' :
         `You are a Twitch viewer. Write in ${lang}. 1-2 sentences max.`;
       userPrompt = `Reply to: "${taggedMessage}"`;
     } else {
       system = [
         custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. Short reactions.`,
         `The streamer said: "${transcribedText}"` + (chatCtx ? '\n' + chatCtx : ''),
-        'Short comment. No dots. Dont repeat same phrases.',
+        'Natural chat message. Max 30 chars.',
       ].filter(Boolean).join('\n');
       userPrompt = 'React to what the streamer just said.';
     }
