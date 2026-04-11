@@ -70,25 +70,34 @@ export class BotManager {
   async onTranscription(text: string): Promise<void> {
     if (this.stopped || !text.trim()) return;
     
-    // Check if any bot was mentioned by name
     const textLower = text.toLowerCase();
+    let responded = false;
+    
+    // Only respond if bot name is mentioned in transcription
     for (const [name, bot] of this.bots) {
       if (bot.connected && textLower.includes(name.toLowerCase())) {
         console.log('[bot] Bot mentioned:', name);
         setTimeout(async () => {
-          if (!this.stopped && bot.connected && Date.now() - bot.lastMsgTime > 3000) {
+          if (!this.stopped && bot.connected && Date.now() - bot.lastMsgTime > 5000) {
             const msg = await this.ai.generateFromTranscription(bot.username, text, this.language, bot.index);
             if (msg && !this.stopped) {
               await bot.client.say('#' + this.channel, msg);
               console.log('[bot] Responded to mention:', name, msg);
+              responded = true;
             }
           }
         }, 1000 + Math.random() * 2000);
       }
     }
     
-    // Skip some transcriptions for variety
-    if (Math.random() < 0.2) {
+    // If bot responded to mention, don't also respond to transcription
+    if (responded) {
+      console.log('[bot] Bot already responded to mention, skipping transcription');
+      return;
+    }
+    
+    // Only respond 40% of the time to feel natural
+    if (Math.random() > 0.3) {
       console.log('[bot] Skipping transcription (random)');
       return;
     }
