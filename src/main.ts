@@ -33,6 +33,48 @@ app.get('/api/learn/download', (_req, res) => {
     res.status(404).json({ error: 'No saved data' });
   }
 });
+app.get('/api/learn/json', (_req, res) => {
+  const p = getLearnDataPath();
+  if (fs.existsSync(p)) {
+    const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    // Send only stats, not full chain (too big)
+    res.json({ messages: data.messages, words: data.words, uniqueWords: Object.keys(data.chain || {}).length });
+  } else {
+    res.json({ messages: 0, words: 0, uniqueWords: 0 });
+  }
+});
+app.get('/api/learn/view', (_req, res) => {
+  const p = getLearnDataPath();
+  if (!fs.existsSync(p)) {
+    res.send('<html><body><h1>No saved data</h1><p>Start learning first.</p></body></html>');
+    return;
+  }
+  const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+  const topPhrases = Object.entries(data.chain || {})
+    .filter(([k, v]: any) => v.length > 1)
+    .sort((a: any, b: any) => b[1].length - a[1].length)
+    .slice(0, 50)
+    .map(([k, v]: any) => `<tr><td>${k}</td><td>${v.slice(0,5).join(', ')}</td><td>${v.length}</td></tr>`)
+    .join('');
+  res.send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Markov Chain</title>
+<style>body{font-family:monospace;background:#111;color:#eee;padding:20px}
+h1{color:#9d5cf6}table{border-collapse:collapse;width:100%;margin-top:20px}
+th,td{border:1px solid #333;padding:8px;text-align:left}th{background:#222}
+.stats{background:#222;padding:15px;border-radius:8px;margin-bottom:20px}
+a{color:#7c3aed}</style></head>
+<body>
+<h1>📚 Markov Chain — ${data.messages || 0} сообщений, ${data.words || 0} слов</h1>
+<div class="stats">
+<p>Сообщений: <b>${data.messages || 0}</b> | Слов: <b>${data.words || 0}</b> | Уникальных цепочек: <b>${Object.keys(data.chain || {}).length}</b></p>
+<p><a href="/api/learn/download">📥 Скачать JSON</a></p>
+</div>
+<h2>Top 50 цепочек:</h2>
+<table><tr><th>Цепочка</th><th>Следующие слова</th><th>Кол-во</th></tr>
+${topPhrases}
+</table>
+</body></html>`);
+});
 app.get('*', (_req, res) => {
   res.sendFile(path.join(FE_DIST, 'index.html'));
 });
