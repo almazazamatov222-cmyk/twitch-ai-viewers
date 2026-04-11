@@ -262,9 +262,7 @@ const themeOverrides = {
             <span class="stat-item">👥 {{ presenceCount }}/{{ totalBots }}</span>
             <span class="stat-item">👁 {{ streamViewers.toLocaleString() }}</span>
             <span class="stat-item">⏱ {{ uptime }}</span>
-            <n-button quaternary size="small" @click="claimPoints">
-              🎁 Баллы
-            </n-button>
+            <!--points disabled-->
           </div>
         </div>
 
@@ -352,7 +350,7 @@ const themeOverrides = {
                               <div class="bot-info">
                                 <span class="bot-name">{{ bot.username }}</span>
                                 <span class="bot-status" :class="bot.state">{{ bot.displayState || bot.state }}</span>
-                                <span class="bot-points" v-if="bot.points">🪙 {{ bot.points }} pts</span>
+                                <span class="bot-points" v-if="false">🪙 {{ bot.points }} pts</span>
                               </div>
                             </div>
                           </template>
