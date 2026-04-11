@@ -164,7 +164,7 @@ export class AIService {
     try {
       const res = await this.groq.chat.completions.create({
         model: 'llama-3.1-8b-instant',
-        max_tokens: 30,
+        max_tokens: 15,
         temperature: 1.0,
         frequency_penalty: 0,
         presence_penalty: 2.0,
