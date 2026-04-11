@@ -139,7 +139,7 @@ if (Date.now() - bot.lastMsgTime < 5000) return;
         message, color: tags.color || null, isBot: isBotAccount, id: tags.id || String(Date.now()),
       });
       if (!isBotAccount) {
-        this.ai.addRealMessage(tags['display-name'] || tags.username || 'viewer', message);
+        // chat reading disabled - only transcription
         for (const [botKey, bot] of this.bots) {
           if (!bot.connected) continue;
           if (message.toLowerCase().includes('@' + botKey) || message.toLowerCase().includes('@' + bot.username.toLowerCase())) {
