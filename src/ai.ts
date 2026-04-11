@@ -155,7 +155,7 @@ export class AIService {
       system = [
         custom ? custom.sys : `You are a Twitch viewer. Write in ${lang}. Short reactions.`,
         `The streamer said: "${transcribedText}"` + (chatCtx ? '\n' + chatCtx : ''),
-        'Natural chat message. Max 30 chars.',
+        'MESSAGE MAX 30 CHARS. NO MORE.',
       ].filter(Boolean).join('\n');
       userPrompt = 'React to what the streamer just said.';
     }

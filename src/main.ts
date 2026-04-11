@@ -262,6 +262,16 @@ async function autoStart(): Promise<void> {
   isStarted = true;
   io.emit('bots:started', { bots: startedBots });
   console.log('[server] started', startedBots.length, 'bots');
+  
+  // Send greeting after 3 seconds
+  setTimeout(() => {
+    if (manager) {
+      const greetings = ['ку', 'привет', 'дарова', ' всем привет'];
+      const randomBot = startedBots[Math.floor(Math.random() * startedBots.length)];
+      const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+      manager.sendManual([randomBot], greeting);
+    }
+  }, 3000);
 
   // Start transcription
   transcriber = new TranscriptionService(cfg.groqKey, cfg.channel);
