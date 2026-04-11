@@ -177,8 +177,27 @@ async function loadFromGitHub(): Promise<any | null> {
     console.log('[github] No GITHUB_TOKEN or MARKOV_GIST_ID configured');
     return null;
   }
+  
+  let gistId = MARKOV_GIST_ID;
+  
+  // If 'auto', try to load existing gist ID from file
+  if (gistId === 'auto') {
+    const gistIdPath = path.join(DATA_DIR, 'gist-id.txt');
+    try {
+      if (fs.existsSync(gistIdPath)) {
+        gistId = fs.readFileSync(gistIdPath, 'utf-8').trim();
+        console.log('[github] Using saved gist ID:', gistId);
+      }
+    } catch {}
+    
+    if (gistId === 'auto' || !gistId) {
+      console.log('[github] No gist ID found, will create on first save');
+      return null;
+    }
+  }
+  
   try {
-    const r = await axios.get(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
+    const r = await axios.get(`https://api.github.com/gists/${gistId}`, {
       headers: { Authorization: 'token ' + GITHUB_TOKEN },
     });
     const files = r.data.files;
@@ -195,9 +214,23 @@ async function loadFromGitHub(): Promise<any | null> {
 
 async function saveToGitHub(data: any): Promise<boolean> {
   if (!GITHUB_TOKEN || !MARKOV_GIST_ID) return false;
+  
+  let gistId = MARKOV_GIST_ID;
+  
+  // If 'auto', try to load existing gist ID from file
+  if (gistId === 'auto') {
+    const gistIdPath = path.join(DATA_DIR, 'gist-id.txt');
+    try {
+      if (fs.existsSync(gistIdPath)) {
+        gistId = fs.readFileSync(gistIdPath, 'utf-8').trim();
+        console.log('[github] Using saved gist ID:', gistId);
+      }
+    } catch {}
+  }
+  
   try {
     const json = JSON.stringify(data, null, 2);
-    if (MARKOV_GIST_ID === 'auto') {
+    if (gistId === 'auto' || !gistId) {
       // Create new gist
       const r = await axios.post('https://api.github.com/gists', {
         description: 'TwitchBoost Markov Chain',
@@ -206,14 +239,14 @@ async function saveToGitHub(data: any): Promise<boolean> {
       }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
       const newId = r.data.id;
       console.log('[github] Created new gist:', newId);
-      // Save gist ID to local file for future use
+      // Save gist ID to local file
       try {
         fs.writeFileSync(path.join(DATA_DIR, 'gist-id.txt'), newId);
       } catch {}
       return true;
     } else {
       // Update existing gist
-      await axios.patch(`https://api.github.com/gists/${MARKOV_GIST_ID}`, {
+      await axios.patch(`https://api.github.com/gists/${gistId}`, {
         files: { 'markov-chain.json': { content: json } },
       }, { headers: { Authorization: 'token ' + GITHUB_TOKEN } });
       console.log('[github] Updated gist');
