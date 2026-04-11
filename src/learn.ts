@@ -64,7 +64,7 @@ export class LearnBot {
 
   stop(): void {
     if (this.client) {
-      this.client.quit();
+      this.client.disconnect();
       this.client = null;
     }
     this.running = false;

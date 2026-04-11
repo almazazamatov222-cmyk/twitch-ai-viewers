@@ -89,6 +89,13 @@ function readEnvConfig() {
   return { channel, groqKey, language, context, bots };
 }
 
+function readLearnConfig() {
+  return {
+    channel: extractChannel(process.env.LEARN_CHANNEL || ''),
+    token: (process.env.LEARN_OAUTH || '').trim(),
+  };
+}
+
 // ── Helix ───────────────────────────────────────────────────────────────────
 let appToken: string | null = null;
 async function getAppToken(): Promise<string | null> {
@@ -206,11 +213,16 @@ io.on('connection', socket => {
     io.emit('config', { botsPerTranscript: n });
   });
   
-  socket.on('learn:start', async (data: { channel: string; token: string }) => {
+  socket.on('learn:start', async () => {
+    const config = readLearnConfig();
+    if (!config.channel || !config.token) {
+      socket.emit('learn:error', { message: 'Настройте LEARN_CHANNEL и LEARN_OAUTH в Variables' });
+      return;
+    }
     if (learnBot) learnBot.stop();
     learnBot = new LearnBot((event, d) => io.emit(event, d));
     try {
-      await learnBot.start(data.channel, data.token);
+      await learnBot.start(config.channel, config.token);
       socket.emit('learn:started', { ok: true });
     } catch (e: any) {
       socket.emit('learn:error', { message: e.message });

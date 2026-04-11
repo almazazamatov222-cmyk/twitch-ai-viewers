@@ -40,20 +40,17 @@ const manualMessage = ref('')
 const replyingTo = ref(null)
 const currentTranscript = ref('')
 const transcriptHistory = reactive([])
-const learnChannel = ref('')
-const learnOAuth = ref('')
 const learning = ref(false)
 const learnStats = reactive({ messages: 0, words: 0 })
 const learnLogs = reactive([])
 
 function startLearning() {
-  if (!learnChannel.value || !learnOAuth.value) return
   learning.value = true
   learnStats.messages = 0
   learnStats.words = 0
   learnLogs.length = 0
-  learnLogs.push(`Подключение к ${learnChannel.value}...`)
-  socket.value.emit('learn:start', { channel: learnChannel.value, token: learnOAuth.value })
+  learnLogs.push('Запуск обучения...')
+  socket.value.emit('learn:start')
 }
 
 function stopLearning() {
@@ -461,18 +458,14 @@ const themeOverrides = {
                   </div>
                   
                   <n-card title="Настройка обучения">
-                    <n-form>
-                      <n-form-item label="Канал для обучения">
-                        <n-input v-model:value="learnChannel" placeholder="Например: xqc" />
-                      </n-form-item>
-                      <n-form-item label="OAuth токен бота (для обучения)">
-                        <n-input v-model:value="learnOAuth" placeholder="oauth:xxxx" type="password" />
-                      </n-form-item>
-                      <n-space>
-                        <n-button type="primary" @click="startLearning">Начать обучение</n-button>
-                        <n-button type="error" @click="stopLearning" :disabled="!learning">Стоп</n-button>
-                      </n-space>
-                    </n-form>
+                    <n-alert type="warning">
+                      Настройки берутся из Variables: LEARN_CHANNEL и LEARN_OAUTH
+                    </n-alert>
+                    <n-divider />
+                    <n-space>
+                      <n-button type="primary" @click="startLearning" :disabled="learning">Старт</n-button>
+                      <n-button type="error" @click="stopLearning" :disabled="!learning">Стоп</n-button>
+                    </n-space>
                   </n-card>
                   
                   <n-card v-if="learning" title="Статус обучения">
