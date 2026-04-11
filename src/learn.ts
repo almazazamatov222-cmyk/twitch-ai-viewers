@@ -140,6 +140,25 @@ export class LearnBot {
     return result.join(' ');
   }
 
+  getData() {
+    return {
+      chain: this.chain,
+      starts: this.starts,
+      messages: this.messages,
+      words: this.words,
+      uniqueWords: Object.keys(this.chain).length,
+    };
+  }
+
+  generatePreview(count: number = 5): string[] {
+    const results: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const gen = this.generate();
+      if (gen) results.push(gen);
+    }
+    return results;
+  }
+
   saveToFile(filepath: string): void {
     const data = {
       chain: this.chain,
@@ -155,6 +174,7 @@ export class LearnBot {
     return {
       messages: this.messages,
       words: this.words,
+      uniqueWords: Object.keys(this.chain).length,
       running: this.running,
     };
   }

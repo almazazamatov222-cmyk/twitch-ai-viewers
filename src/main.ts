@@ -223,7 +223,7 @@ io.on('connection', socket => {
   socket.on('get:learn:config', () => {
     const config = readLearnConfig();
     socket.emit('learn:config', { channel: config.channel });
-    io.emit('learn:status', learnBot ? learnBot.getStats() : { running: false, messages: 0, words: 0 });
+    io.emit('learn:status', learnBot ? learnBot.getStats() : { running: false, messages: 0, words: 0, uniqueWords: 0 });
   });
   
   socket.on('learn:start', async () => {
@@ -249,6 +249,29 @@ io.on('connection', socket => {
     if (learnBot) { learnBot.stop(); learnBot = null; }
     io.emit('learn:log', 'Обучение остановлено');
   });
+
+  socket.on('learn:getData', () => {
+    if (learnBot) {
+      socket.emit('learn:data', learnBot.getData());
+    }
+  });
+
+  socket.on('learn:generate', () => {
+    if (learnBot) {
+      const previews = learnBot.generatePreview(5);
+      socket.emit('learn:previews', previews);
+    }
+  });
+
+  socket.on('learn:save', () => {
+    if (learnBot) {
+      const filepath = path.join(DATA_DIR, 'markov-' + Date.now() + '.json');
+      const data = learnBot.getData();
+      fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+      io.emit('learn:log', 'Сохранено: ' + path.basename(filepath));
+    }
+  });
+  
   socket.on('get:personas', () => socket.emit('personas:update', saved.personas));
   socket.on('get:phrases',  () => socket.emit('phrases:update', saved.phraseGroups));
   socket.on('claim:points', async () => {
