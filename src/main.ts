@@ -592,10 +592,15 @@ async function autoStart(): Promise<void> {
 http.listen(PORT, () => {
   console.log('\nTwitchBoost at http://localhost:' + PORT + '\n');
   
-  if (GITHUB_TOKEN && MARKOV_GIST_ID) {
-    console.log('[github] ✓ GitHub configured');
+  const token = process.env.GITHUB_TOKEN?.trim();
+  const gistId = process.env.MARKOV_GIST_ID?.trim();
+  
+  if (token && gistId) {
+    console.log('[github] ✓ GitHub configured (token length:', token.length, ')');
   } else {
     console.log('[github] ✗ GITHUB_TOKEN or MARKOV_GIST_ID not set');
+    console.log('[github] GITHUB_TOKEN:', token ? 'set' : 'not set');
+    console.log('[github] MARKOV_GIST_ID:', gistId ? 'set' : 'not set');
   }
   
   setTimeout(autoStart, 1500);
