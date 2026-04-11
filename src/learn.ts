@@ -6,8 +6,13 @@ interface MarkovChain {
   [key: string]: string[];
 }
 
+interface BotClient {
+  client: tmi.Client;
+  username: string;
+}
+
 export class LearnBot {
-  private client: tmi.Client | null = null;
+  private clients: BotClient[] = [];
   private chain: MarkovChain = {};
   private starts: string[] = [];
   private keyLength = 2;
@@ -20,53 +25,73 @@ export class LearnBot {
     this.emit = emit;
   }
 
-  async start(channel: string, token: string): Promise<void> {
+  async start(channel: string, tokens: string[]): Promise<void> {
     if (this.running) return;
     
     const chan = channel.toLowerCase().replace(/^#/, '');
-    this.client = tmi.client({
-      channels: [chan],
-      identity: {
-        username: chan,
-        password: token,
-      },
-      options: {
-        debug: false,
-      },
-    });
+    this.emit('learn:log', `Запуск ${tokens.length} ботов на канале ${chan}`);
+    
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      const username = 'bot' + (i + 1);
+      
+      try {
+        const client = tmi.client({
+          channels: [chan],
+          identity: {
+            username: username,
+            password: token,
+          },
+          options: {
+            debug: false,
+          },
+        });
 
-    this.client.on('message', (chan, tags, msg, self) => {
-      if (self) return;
-      this.learn(msg);
-      this.messages++;
-      this.emit('learn:status', {
-        running: this.running,
-        messages: this.messages,
-        words: this.words,
-      });
-      if (this.messages % 100 === 0) {
-        this.emit('learn:log', `Изучено ${this.messages} сообщений`);
+        client.on('message', (chan, tags, msg, self) => {
+          if (self) return;
+          this.learn(msg);
+          this.messages++;
+          this.emit('learn:status', {
+            running: this.running,
+            messages: this.messages,
+            words: this.words,
+          });
+          if (this.messages % 100 === 0) {
+            this.emit('learn:log', `Изучено ${this.messages} сообщений`);
+          }
+        });
+
+        client.on('connected', () => {
+          this.emit('learn:log', `✅ ${username} подключен`);
+        });
+
+        client.on('disconnected', () => {
+          this.emit('learn:log', `❌ ${username} отключен`);
+        });
+
+        client.connect();
+        this.clients.push({ client, username });
+      } catch (e: any) {
+        this.emit('learn:log', `⚠ ${username}: ${e.message}`);
       }
-    });
+    }
 
-    this.client.on('connected', () => {
-      this.running = true;
-      this.emit('learn:log', `Подключено к #${chan}`);
-      this.emit('learn:status', {
-        running: true,
-        messages: this.messages,
-        words: this.words,
-      });
+    this.running = true;
+    this.emit('learn:log', `Обучение началось`);
+    this.emit('learn:status', {
+      running: true,
+      messages: this.messages,
+      words: this.words,
     });
-
-    this.client.connect();
   }
 
   stop(): void {
-    if (this.client) {
-      this.client.disconnect();
-      this.client = null;
+    for (const bot of this.clients) {
+      try {
+        bot.client.disconnect();
+      } catch (e) {}
     }
+    this.clients = [];
     this.running = false;
     this.emit('learn:log', 'Обучение остановлено');
     this.emit('learn:status', {

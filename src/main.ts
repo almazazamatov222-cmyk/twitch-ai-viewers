@@ -219,6 +219,12 @@ io.on('connection', socket => {
     io.emit('config', { botsPerTranscript: n });
   });
   
+  socket.on('get:learn:config', () => {
+    const config = readLearnConfig();
+    socket.emit('learn:config', { channel: config.channel });
+    io.emit('learn:status', learnBot ? learnBot.getStats() : { running: false, messages: 0, words: 0 });
+  });
+  
   socket.on('learn:start', async () => {
     const config = readLearnConfig();
     if (!config.channel || !config.tokens.length) {
@@ -230,9 +236,9 @@ io.on('connection', socket => {
     learnBot = new LearnBot((e, d) => io.emit(e, d));
     
     try {
-      await learnBot.start(config.channel, config.tokens[0]);
+      await learnBot.start(config.channel, config.tokens);
       socket.emit('learn:started', { ok: true });
-      io.emit('learn:log', 'Обучение началось на канале ' + config.channel);
+      io.emit('learn:log', 'Обучение началось на канале ' + config.channel + ' с ' + config.tokens.length + ' ботами');
     } catch (e: any) {
       socket.emit('learn:error', { message: e.message });
     }
